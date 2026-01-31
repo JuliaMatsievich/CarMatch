@@ -51,8 +51,10 @@ describe("ChatSidebar", () => {
     const sessions: ChatSessionListItem[] = [
       {
         id: "s1",
-        message_count: 5,
+        status: "active",
         created_at: "2024-01-01T00:00:00Z",
+        updated_at: "2024-01-01T00:00:00Z",
+        message_count: 5,
       },
     ];
 
@@ -68,8 +70,10 @@ describe("ChatSidebar", () => {
     const sessions: ChatSessionListItem[] = [
       {
         id: "s1",
-        message_count: 3,
+        status: "active",
         created_at: "2024-01-01T00:00:00Z",
+        updated_at: "2024-01-01T00:00:00Z",
+        message_count: 3,
       },
     ];
 
@@ -94,8 +98,10 @@ describe("ChatSidebar", () => {
     const sessions: ChatSessionListItem[] = [
       {
         id: "s1",
-        message_count: 2,
+        status: "active",
         created_at: "2024-01-01T00:00:00Z",
+        updated_at: "2024-01-01T00:00:00Z",
+        message_count: 2,
       },
     ];
 

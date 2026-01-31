@@ -20,7 +20,8 @@ describe("CarResults", () => {
         price_rub: 2_500_000,
         body_type: "седан",
         fuel_type: "бензин",
-        images: null,
+        transmission: null,
+        images: [],
       },
     ];
 
@@ -42,7 +43,8 @@ describe("CarResults", () => {
         price_rub: 3_000_000,
         body_type: "седан",
         fuel_type: "гибрид",
-        images: null,
+        transmission: null,
+        images: [],
       },
     ];
 
@@ -61,6 +63,7 @@ describe("CarResults", () => {
         price_rub: 2_500_000,
         body_type: null,
         fuel_type: null,
+        transmission: null,
         images: ["https://example.com/car.jpg"],
       },
     ];
@@ -80,7 +83,8 @@ describe("CarResults", () => {
         price_rub: 2_500_000,
         body_type: null,
         fuel_type: null,
-        images: null,
+        transmission: null,
+        images: [],
       },
       {
         id: 2,
@@ -90,7 +94,8 @@ describe("CarResults", () => {
         price_rub: 3_000_000,
         body_type: null,
         fuel_type: null,
-        images: null,
+        transmission: null,
+        images: [],
       },
     ];
 

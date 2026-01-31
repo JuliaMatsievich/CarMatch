@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import AuthPage from "./AuthPage";
 import { AuthProvider } from "../contexts/AuthContext";
 import * as authApi from "../api/auth";
+import type { AuthResponse } from "../api/auth";
 
 vi.mock("../api/auth");
 
@@ -118,10 +119,10 @@ describe("AuthPage", () => {
 
   it("disables submit during loading", async () => {
     const user = userEvent.setup();
-    let resolveLogin: (v: unknown) => void;
+    let resolveLogin!: (value: AuthResponse) => void;
     vi.mocked(authApi.login).mockImplementation(
       () =>
-        new Promise((r) => {
+        new Promise<AuthResponse>((r) => {
           resolveLogin = r;
         })
     );
@@ -137,7 +138,7 @@ describe("AuthPage", () => {
 
     expect(screen.getByRole("button", { name: /загрузка/i })).toBeDisabled();
 
-    resolveLogin!({
+    resolveLogin({
       access_token: "t",
       token_type: "bearer",
       user: {
