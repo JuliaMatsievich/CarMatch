@@ -1,0 +1,54 @@
+.wrap {
+  margin-top: 16px;
+}
+
+.title {
+  font-size: 1.125rem;
+  color: #334155;
+  margin: 0 0 12px 0;
+  font-weight: 600;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e2e8f0;
+}
+
+.image {
+  width: 100%;
+  aspect-ratio: 16/10;
+  object-fit: cover;
+  background: #f1f5f9;
+}
+
+.body {
+  padding: 12px;
+}
+
+.name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 4px 0;
+}
+
+.meta {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin: 0 0 4px 0;
+}
+
+.specs {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  margin: 0;
+}

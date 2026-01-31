@@ -1,0 +1,13 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+ENV PYTHONPATH=/app
+ENV DATABASE_URL=postgresql+psycopg://carmatch:carmatch@postgres:5432/carmatch
+
+EXPOSE 8000
+CMD ["sh", "-c", "python -m alembic upgrade head 2>/dev/null || true; exec python -m uvicorn main:app --host 0.0.0.0 --port 8000"]

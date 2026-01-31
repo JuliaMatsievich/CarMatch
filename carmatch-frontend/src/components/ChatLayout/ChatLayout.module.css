@@ -1,0 +1,149 @@
+.layout {
+  display: flex;
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+.sidebar {
+  width: 260px;
+  min-width: 260px;
+  background: white;
+  border-right: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebarHeader {
+  padding: 20px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.logoWithIcon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.carIconBg {
+  background: #2563eb;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.carIcon {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: white;
+}
+
+.sidebarTitle {
+  color: #2563eb;
+  font-size: 1.25rem;
+  margin: 0;
+  font-weight: bold;
+}
+
+.newChatBtn {
+  margin: 16px;
+  padding: 10px 16px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.newChatBtn:hover {
+  background: #1d4ed8;
+}
+
+.sessionList {
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.sessionList li {
+  margin-bottom: 4px;
+}
+
+.sessionItem,
+.sessionItemActive {
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  background: transparent;
+  color: #334155;
+  font-size: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sessionItem:hover,
+.sessionItemActive {
+  background: #e2e8f0;
+}
+
+.sessionItemActive {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.sessionTitle {
+  font-weight: 500;
+}
+
+.sessionMeta {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.sidebarFooter {
+  padding: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.logoutBtn {
+  width: 100%;
+  padding: 10px;
+  background: transparent;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #64748b;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.logoutBtn:hover {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.messagesArea {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.carResultsWrap {
+  padding: 16px;
+  border-top: 1px solid #e2e8f0;
+}

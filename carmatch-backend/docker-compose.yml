@@ -1,0 +1,32 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: carmatch-postgres
+    environment:
+      POSTGRES_USER: carmatch
+      POSTGRES_PASSWORD: carmatch
+      POSTGRES_DB: carmatch
+    ports:
+      - "5432:5432"
+    volumes:
+      - carmatch_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U carmatch -d carmatch"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    container_name: carmatch-api
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://carmatch:carmatch@postgres:5432/carmatch
+      SECRET_KEY: dev-secret-key
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  carmatch_pgdata:

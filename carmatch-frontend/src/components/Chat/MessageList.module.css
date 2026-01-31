@@ -1,0 +1,59 @@
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.userMessage {
+  align-self: flex-end;
+  max-width: 80%;
+  background: #2563eb;
+  color: white;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border-bottom-right-radius: 4px;
+}
+
+.assistantMessage {
+  align-self: flex-start;
+  max-width: 80%;
+  background: #e2e8f0;
+  color: #334155;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border-bottom-left-radius: 4px;
+}
+
+.role {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+  opacity: 0.9;
+}
+
+.content {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  color: #64748b;
+  text-align: center;
+}
+
+.empty p {
+  max-width: 400px;
+  margin: 0;
+  line-height: 1.6;
+}
