@@ -67,7 +67,8 @@ describe("ChatLayout", () => {
         price_rub: 2_500_000,
         body_type: null,
         fuel_type: null,
-        images: null,
+        transmission: null,
+        images: [],
       },
     ];
 

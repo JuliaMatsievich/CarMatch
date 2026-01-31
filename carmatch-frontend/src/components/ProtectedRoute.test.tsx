@@ -4,21 +4,6 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { AuthProvider } from "../contexts/AuthContext";
 
-function TestProtectedApp() {
-  return (
-    <AuthProvider>
-      <MemoryRouter>
-        <Routes>
-          <Route path="/login" element={<div>Login Page</div>} />
-          <Route element={<ProtectedRoute />}>
-            <Route path="/chat" element={<div>Chat Page</div>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>
-    </AuthProvider>
-  );
-}
-
 describe("ProtectedRoute", () => {
   beforeEach(() => {
     localStorage.clear();
