@@ -1,10 +1,13 @@
-import axios from 'axios';
+import axios from "axios";
 
-const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const apiOrigin = (
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
+).replace(/\/+$/, "");
+const baseURL = `${apiOrigin}/api/v1`;
 
 export const apiClient = axios.create({
-  baseURL: `${baseURL}/api/v1`,
-  headers: { 'Content-Type': 'application/json' },
+  baseURL,
+  headers: { "Content-Type": "application/json" },
 });
 
 let authToken: string | null = null;

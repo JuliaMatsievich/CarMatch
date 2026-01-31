@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
     cors_origins: str = DEFAULT_CORS_ORIGINS
+    # GigaChat API (authorization key from https://developers.sber.ru/studio/)
+    gigachat_credentials: str = ""
+    gigachat_verify_ssl_certs: bool = True
 
     class Config:
         env_file = ".env"

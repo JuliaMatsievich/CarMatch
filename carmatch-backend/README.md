@@ -15,18 +15,31 @@ docker compose up -d
 
 API: http://localhost:8000  
 Документация: http://localhost:8000/docs  
-Эндпоинты: `POST /api/v1/auth/register`, `POST /api/v1/auth/login`.
+Эндпоинты: `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `POST /api/v1/chat/complete` (чат с GigaChat).
 
-**Важно:** если на порту 8000 уже запущен другой процесс (например, старый uvicorn), остановите его — иначе запросы будут уходить не в Docker API.
+**Важно:** если на порту 8000 уже запущен другой процесс (например, старый uvicorn), остановите его — иначе запросы будут уходить не в Docker API. Если в Swagger (/docs) нет эндпоинта `POST /api/v1/chat/complete`, пересоберите образ: `docker compose build --no-cache api && docker compose up -d`.
 
 ## Локальный запуск (без Docker API)
 
-1. PostgreSQL: `docker compose up -d postgres`
-2. Таблица: `docker exec carmatch-postgres psql -U carmatch -d carmatch -c "CREATE TABLE IF NOT EXISTS users (...);"` (см. полный DDL в разделе 5 спецификации)
-3. `.env`: `DATABASE_URL=postgresql+psycopg://carmatch:carmatch@localhost:5432/carmatch`
-4. `pip install -r requirements.txt && python -m uvicorn main:app --reload --port 8000`
+1. **Перейдите в папку бэкенда:** `cd carmatch-backend` (uvicorn должен запускаться именно отсюда).
+2. PostgreSQL: `docker compose up -d postgres`
+3. Таблица: `docker exec carmatch-postgres psql -U carmatch -d carmatch -c "CREATE TABLE IF NOT EXISTS users (...);"` (см. полный DDL в разделе 5 спецификации)
+4. `.env`: `DATABASE_URL=postgresql+psycopg://carmatch:carmatch@localhost:5432/carmatch`
+5. `pip install -r requirements.txt && python -m uvicorn main:app --reload --port 8000`
+
+При старте в консоли выводятся все маршруты; среди них должен быть `POST /api/v1/chat/complete`. Если его нет — вы запустили uvicorn не из папки `carmatch-backend`.
 
 На Windows при ошибке `UnicodeDecodeError` в psycopg2 используйте Docker (см. выше) или драйвер psycopg3 (в коде уже используется `postgresql+psycopg`).
+
+### GigaChat (чат)
+
+Чтобы работал эндпоинт `POST /api/v1/chat/complete`, в `.env` задайте ключ авторизации GigaChat:
+
+```env
+GIGACHAT_CREDENTIALS=<ключ из https://developers.sber.ru/studio/>
+```
+
+При проблемах с SSL (например, локально) можно указать: `GIGACHAT_VERIFY_SSL_CERTS=false`.
 
 ## Тестирование
 

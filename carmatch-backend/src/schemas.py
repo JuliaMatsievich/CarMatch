@@ -26,3 +26,19 @@ class AuthResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
+
+
+# --- GigaChat (свободный чат) ---
+
+
+class ChatMessage(BaseModel):
+    role: str  # "user" | "assistant"
+    content: str
+
+
+class ChatCompleteRequest(BaseModel):
+    messages: list[ChatMessage]
+
+
+class ChatCompleteResponse(BaseModel):
+    content: str
