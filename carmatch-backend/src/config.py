@@ -21,9 +21,12 @@ class Settings(BaseSettings):
         url = self.database_url
         if not url.isascii():
             return DEFAULT_DATABASE_URL
-        # Render Postgres даёт postgresql:// — конвертируем для psycopg3
-        if url.startswith("postgresql://") and "postgresql+psycopg" not in url:
-            url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+        # Render Postgres даёт postgresql:// или postgres:// — конвертируем для psycopg3
+        if "postgresql+psycopg" not in url:
+            if url.startswith("postgresql://"):
+                url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+            elif url.startswith("postgres://"):
+                url = url.replace("postgres://", "postgresql+psycopg://", 1)
         return url
 
     def get_cors_origins_list(self) -> list[str]:
