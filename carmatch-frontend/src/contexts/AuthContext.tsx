@@ -1,9 +1,16 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { setAuthToken } from '../api/client';
-import type { AuthUser } from '../api/auth';
+/* eslint-disable react-refresh/only-export-components */
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
+import { setAuthToken } from "../api/client";
+import type { AuthUser } from "../api/auth";
 
-const TOKEN_KEY = 'carmatch_access_token';
-const USER_KEY = 'carmatch_user';
+const TOKEN_KEY = "carmatch_access_token";
+const USER_KEY = "carmatch_user";
 
 interface AuthState {
   token: string | null;
@@ -80,7 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
   if (!ctx) {
-    throw new Error('useAuth must be used within AuthProvider');
+    throw new Error("useAuth must be used within AuthProvider");
   }
   return ctx;
 }

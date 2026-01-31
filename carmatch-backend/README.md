@@ -27,3 +27,12 @@ API: http://localhost:8000
 4. `pip install -r requirements.txt && python -m uvicorn main:app --reload --port 8000`
 
 На Windows при ошибке `UnicodeDecodeError` в psycopg2 используйте Docker (см. выше) или драйвер psycopg3 (в коде уже используется `postgresql+psycopg`).
+
+## Тестирование
+
+```bash
+pip install -r requirements.txt
+pytest
+```
+
+Тесты используют SQLite in-memory, PostgreSQL не требуется.
