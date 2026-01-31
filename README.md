@@ -46,11 +46,22 @@ CarMatch/
 
 ---
 
+## Как устроен локальный запуск
+
+- **Backend (API + БД)** — запускается в **Docker** из корня репозитория. Uvicorn не запускается вручную: он уже внутри контейнера.
+- **Frontend** — запускается **локально** через `npm run dev` в папке `carmatch-frontend`.
+
+Порядок: сначала поднять Docker (бэкенд), затем запустить фронтенд.
+
+---
+
 ## Локальный запуск
 
-### 1. Backend и база данных
+### 1. Backend и база данных (Docker)
 
-В корне репозитория:
+Команды выполнять **в корне репозитория** (папка `CarMatch/`).
+
+**Запустить контейнеры (PostgreSQL + API):**
 
 ```bash
 docker compose up -d
@@ -61,8 +72,23 @@ docker compose up -d
 - **PostgreSQL** — порт `5432`, БД `carmatch`, пользователь/пароль `carmatch`
 - **API** — порт `8000`, при старте выполняются миграции Alembic
 
+**Остановить контейнеры:**
+
+```bash
+docker compose down
+```
+
+Остановить и удалить тома с данными БД:
+
+```bash
+docker compose down -v
+```
+
+**Полезные ссылки (при запущенном API):**
+
 - API: http://localhost:8000
-- Документация: http://localhost:8000/docs
+- **Swagger (документация API):** http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
 
 Подробнее: [carmatch-backend/README.md](carmatch-backend/README.md).
 

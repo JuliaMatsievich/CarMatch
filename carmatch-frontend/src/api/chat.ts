@@ -1,4 +1,23 @@
-import { apiClient } from './client';
+import { apiClient } from "./client";
+
+/** Сообщение для свободного чата с GigaChat (без сессий в БД). */
+export interface ChatCompleteMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface ChatCompleteResponse {
+  content: string;
+}
+
+export async function chatComplete(
+  messages: ChatCompleteMessage[]
+): Promise<ChatCompleteResponse> {
+  const { data } = await apiClient.post<ChatCompleteResponse>("chat/complete", {
+    messages,
+  });
+  return data;
+}
 
 export interface ChatSession {
   id: string;
@@ -45,16 +64,22 @@ export interface SendMessageResponse {
 }
 
 export async function createSession(): Promise<ChatSession> {
-  const { data } = await apiClient.post<ChatSession>('/chat/sessions');
+  const { data } = await apiClient.post<ChatSession>("/chat/sessions");
   return data;
 }
 
-export async function getSessions(): Promise<{ sessions: ChatSessionListItem[] }> {
-  const { data } = await apiClient.get<{ sessions: ChatSessionListItem[] }>('/chat/sessions');
+export async function getSessions(): Promise<{
+  sessions: ChatSessionListItem[];
+}> {
+  const { data } = await apiClient.get<{ sessions: ChatSessionListItem[] }>(
+    "/chat/sessions"
+  );
   return data;
 }
 
-export async function getMessages(sessionId: string): Promise<{ messages: MessageListItem[] }> {
+export async function getMessages(
+  sessionId: string
+): Promise<{ messages: MessageListItem[] }> {
   const { data } = await apiClient.get<{ messages: MessageListItem[] }>(
     `/chat/sessions/${sessionId}/messages`
   );
