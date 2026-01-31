@@ -19,7 +19,7 @@ services:
   api:
     build:
       context: ./carmatch-backend
-      dockerfile: Dockerfile
+      dockerfile: ./Dockerfile
     container_name: carmatch-api
     ports:
       - "8000:8000"
