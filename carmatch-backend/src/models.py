@@ -13,9 +13,9 @@ from sqlalchemy import (
     Text,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
+from sqlalchemy.dialects.postgresql import UUID
 
-from src.database import Base
+from src.database import Base, ArrayTextCompat, JSONBCompat
 
 
 def utcnow():
@@ -46,9 +46,9 @@ class Session(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     status = Column(String(20), default="active", nullable=False)
-    extracted_params = Column(JSONB, default=dict, nullable=False)
-    search_criteria = Column(JSONB, default=dict, nullable=False)
-    search_results = Column(JSONB, default=list, nullable=False)
+    extracted_params = Column(JSONBCompat, default=dict, nullable=False)
+    search_criteria = Column(JSONBCompat, default=dict, nullable=False)
+    search_results = Column(JSONBCompat, default=list, nullable=False)
     created_at = Column(DateTime, default=utcnow, nullable=False)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
     completed_at = Column(DateTime, nullable=True)
@@ -71,7 +71,7 @@ class ChatMessage(Base):
     session_id = Column(UUID(as_uuid=True), ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False, index=True)
     role = Column(String(20), nullable=False)
     content = Column(Text, nullable=False)
-    extra_metadata = Column("metadata", JSONB, default=dict, nullable=False)
+    extra_metadata = Column("metadata", JSONBCompat, default=dict, nullable=False)
     sequence_order = Column(Integer, nullable=False)
     created_at = Column(DateTime, default=utcnow, nullable=False)
 
@@ -119,7 +119,7 @@ class CarGeneration(Base):
     model_id = Column(Integer, ForeignKey("car_models.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String(100), nullable=True)  # Generation name if available
     external_id = Column(String(100), nullable=True)  # The ID from XML
-    years = Column(JSONB, default=dict, nullable=False)  # Store year ranges as JSON
+    years = Column(JSONBCompat, default=dict, nullable=False)  # Store year ranges as JSON
     created_at = Column(DateTime, default=utcnow, nullable=False)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
 
@@ -178,8 +178,8 @@ class Car(Base):
     horsepower = Column(Integer, nullable=True)
     modification = Column(String(100), nullable=True)  # полная строка модификации (например "1.6d MT 90 л.с.")
     transmission = Column(String(20), nullable=True)  # тип коробки: MT, AMT, CVT и т.д.
-    specs = Column(JSONB, default=dict, nullable=False)
-    images = Column(ARRAY(Text), nullable=True)
+    specs = Column(JSONBCompat, default=dict, nullable=False)
+    images = Column(ArrayTextCompat, nullable=True)
     description = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     imported_at = Column(DateTime, default=utcnow, nullable=False)

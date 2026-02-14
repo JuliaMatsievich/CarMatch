@@ -79,7 +79,6 @@ export function ChatPage() {
   const [messages, setMessages] = useState<MessageListItem[]>([]);
   const [cars, setCars] = useState<CarResult[]>([]);
   const [sendLoading, setSendLoading] = useState(false);
-  const [loadingMessages, setLoadingMessages] = useState(false);
 
   // На /chat без sessionId — получаем «текущий новый диалог» (пустая сессия или создаём одну) и переходим в неё
   useEffect(() => {
@@ -111,14 +110,12 @@ export function ChatPage() {
       setCars([]);
       return;
     }
-    setLoadingMessages(true);
     getMessages(sessionId)
       .then((res) => {
         setMessages(res.messages);
         setCars([]);
       })
-      .catch(() => setMessages([]))
-      .finally(() => setLoadingMessages(false));
+      .catch(() => setMessages([]));
   }, [sessionId]);
 
   const handleNewChat = useCallback(() => {
