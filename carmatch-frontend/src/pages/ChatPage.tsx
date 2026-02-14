@@ -180,7 +180,7 @@ export function ChatPage() {
         }
         getSessions().then((res) => setSessions(res.sessions));
         if (hasCars) {
-          setCars(res.search_results);
+          setCars(res.search_results ?? []);
         } else if (
           res.ready_for_search &&
           res.extracted_params &&
