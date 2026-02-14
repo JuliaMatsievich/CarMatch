@@ -1,11 +1,15 @@
 import { apiClient } from './client';
 
 export interface CarSearchParams {
-  budget_max?: number;
+  brand?: string;
+  model?: string;
   body_type?: string;
-  min_year?: number;
-  fuel_type?: string;
+  year?: number;
+  modification?: string;
   transmission?: string;
+  fuel_type?: string;
+  engine_volume?: number;
+  horsepower?: number;
   limit?: number;
 }
 
@@ -17,10 +21,16 @@ export interface CarResult {
   price_rub: number | null;
   body_type: string | null;
   fuel_type: string | null;
-  transmission: string | null;
+  engine_volume?: number | null;
+  horsepower?: number | null;
+  modification: string | null;   // полная строка модификации (например "1.6d MT 90 л.с.")
+  transmission: string | null;    // тип коробки: MT, AMT, CVT и т.д.
   images: string[];
-  engine_volume?: number;
-  horsepower?: number;
+  description?: string | null;
+  brand_id?: number;
+  model_id?: number;
+  generation_id?: number;
+  modification_id?: number;
 }
 
 export interface CarSearchResponse {

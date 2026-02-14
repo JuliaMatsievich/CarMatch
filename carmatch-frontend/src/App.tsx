@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import AuthPage from "./pages/AuthPage";
-import ChatPage from "./pages/ChatPage";
+import { ChatPage } from "./pages/ChatPage";
 import "./App.css";
 
 const queryClient = new QueryClient();

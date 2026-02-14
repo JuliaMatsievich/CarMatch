@@ -38,6 +38,7 @@ export default function AuthPage() {
           data?: { detail?: string | { msg?: string }[] };
           status?: number;
         };
+        code?: string;
       };
       const detail = ax.response?.data?.detail;
       if (typeof detail === "string") {
@@ -48,6 +49,10 @@ export default function AuthPage() {
           typeof first === "object" && first?.msg
             ? first.msg
             : "Ошибка валидации"
+        );
+      } else if (!ax.response) {
+        setError(
+          "Не удалось подключиться к серверу. Проверьте, что бэкенд запущен (порт 8000) и CORS разрешён для этого адреса."
         );
       } else {
         setError("Ошибка входа или регистрации");

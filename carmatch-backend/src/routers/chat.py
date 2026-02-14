@@ -1,11 +1,15 @@
-"""Роутер для свободного чата с GigaChat (без сессий в БД и поиска машин)."""
+"""Роутер для свободного чата с GigaChat (без сессий в БД и поиска машин).
+
+Под капотом используется общий сервис LLM (`deepseek.py`), который сейчас вызывает GigaChat
+и применяет те же стилевые промпты, что и логика подбора авто.
+"""
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from src.deps import get_current_user
 from src.models import User
 from src.schemas import ChatCompleteRequest, ChatCompleteResponse
-from src.services import gigachat as gigachat_service
+from src.services import deepseek as chat_service
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -21,7 +25,9 @@ def chat_complete(
     """
     try:
         messages = [{"role": m.role, "content": m.content} for m in body.messages]
-        content = gigachat_service.chat_complete(messages)
+        # Используем общий сервис LLM с едиными промптами (deepseek.py),
+        # который сейчас ходит в GigaChat.
+        content = chat_service.chat_complete(messages)
         return ChatCompleteResponse(content=content)
     except ValueError as e:
         raise HTTPException(

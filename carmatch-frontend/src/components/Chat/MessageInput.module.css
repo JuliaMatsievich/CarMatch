@@ -4,6 +4,7 @@
   padding: 16px;
   background: white;
   border-top: 1px solid #e2e8f0;
+  flex-shrink: 0;
 }
 
 .input {

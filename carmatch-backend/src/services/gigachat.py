@@ -42,3 +42,4 @@ def chat_complete(messages: list[dict[str, str]]) -> str:
     if not response.choices:
         return "Пустой ответ от модели."
     return (response.choices[0].message.content or "").strip()
+

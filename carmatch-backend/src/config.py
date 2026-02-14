@@ -1,8 +1,8 @@
 from pydantic_settings import BaseSettings
 
 # psycopg3 — обходит UnicodeDecodeError psycopg2 на Windows при подключении к БД
-DEFAULT_DATABASE_URL = "postgresql+psycopg://carmatch:carmatch@localhost:5432/carmatch"
-DEFAULT_CORS_ORIGINS = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+DEFAULT_DATABASE_URL = "postgresql+psycopg://carmatch:carmatch@localhost:5433/carmatch"
+DEFAULT_CORS_ORIGINS = "http://localhost:5173,http://localhost:3000,http://localhost:3001,http://127.0.0.1:5173,http://127.0.0.1:3000,http://127.0.0.1:3001"
 
 
 class Settings(BaseSettings):
@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     # GigaChat API (authorization key from https://developers.sber.ru/studio/)
     gigachat_credentials: str = ""
     gigachat_verify_ssl_certs: bool = True
+    # LLM через GenAPI (https://gen-api.ru) — DeepSeek Reasoner (используется для сессий подбора авто)
+    genapi_api_key: str = ""  # API-ключ из личного кабинета GenAPI
+    genapi_generate_url: str = ""  # Полный URL "запроса на генерацию" из документации GenAPI
+    genapi_model_id: str = "deepseek-reasoner"
+    genapi_sync_mode: bool = True  # Использовать режим "Сразу ответ" (is_sync=true), если модель поддерживает
 
     class Config:
         env_file = ".env"
