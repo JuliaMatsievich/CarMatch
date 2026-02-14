@@ -283,6 +283,21 @@ def _extract_json_block(text: str) -> str | None:
     return None
 
 
+# Ключевые слова типа кузова для fallback, когда справочник из БД пустой (напр. на Render нет cars)
+# Регулярка -> каноническое значение для search_cars (car_reference_service._body_type_filter_condition)
+FALLBACK_BODY_TYPE_KEYWORDS = [
+    (r"\b(хэтчбек|хетчбек|hatchback)\b", "хэтчбек"),
+    (r"\b(седан|sedan)\b", "седан"),
+    (r"\b(универсал|wagon)\b", "универсал"),
+    (r"\b(внедорожник|suv)\b", "внедорожник"),
+    (r"\b(кроссовер|crossover)\b", "кроссовер"),
+    (r"\b(купе|coupe)\b", "купе"),
+    (r"\b(минивэн|минивен|minivan)\b", "минивэн"),
+    (r"\b(лифтбек|liftback)\b", "лифтбек"),
+    (r"\b(кабриолет|cabriolet)\b", "кабриолет"),
+    (r"\b(пикап|pickup)\b", "пикап"),
+]
+
 # Ключевые слова для извлечения марки в fallback (как пользователь мог написать -> имя в БД)
 FALLBACK_BRAND_KEYWORDS = [
     (r"\b(renault|рено)\b", "Renault"),
@@ -344,7 +359,7 @@ def extract_params_fallback(user_texts: list[str], body_type_reference: list[str
     hp_match = re.search(r"(\d{2,3})\s*л\.?\s*с", text, re.IGNORECASE)
     if hp_match:
         result["horsepower"] = hp_match.group(1)
-    # Тип кузова: если в справочнике есть «Хэтчбек 5 дв.», а пользователь написал «хэтчбек» — считаем совпадением
+    # Тип кузова: сначала по справочнику из БД (если есть записи cars с body_type)
     for bt in body_type_reference or []:
         if not bt or not bt.strip():
             continue
@@ -357,6 +372,13 @@ def extract_params_fallback(user_texts: list[str], body_type_reference: list[str
         if len(first_word) >= 3 and first_word in text:
             result["body_type"] = bt.strip()
             break
+    # Если справочник пустой (напр. на Render нет данных в cars) — распознаём по ключевым словам.
+    # search_cars принимает «хэтчбек»/«седан» и т.д. и сам сопоставляет с БД.
+    if "body_type" not in result:
+        for keyword, canonical in FALLBACK_BODY_TYPE_KEYWORDS:
+            if re.search(keyword, text):
+                result["body_type"] = canonical
+                break
     return result
 
 
