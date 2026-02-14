@@ -9,7 +9,7 @@ from alembic import context
 
 from src.config import settings
 from src.database import Base
-from src.models import User  # noqa: F401 - import so Base has all models
+from src.models import User, Session, ChatMessage, Car, SearchParameter  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.get_database_url())

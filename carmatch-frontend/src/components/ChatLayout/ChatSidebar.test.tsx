@@ -47,11 +47,12 @@ describe("ChatSidebar", () => {
     expect(onLogout).toHaveBeenCalledTimes(1);
   });
 
-  it("renders session list", () => {
+  it("renders session list with title", () => {
     const sessions: ChatSessionListItem[] = [
       {
         id: "s1",
         status: "active",
+        title: "Подбор авто до 2 млн",
         created_at: "2024-01-01T00:00:00Z",
         updated_at: "2024-01-01T00:00:00Z",
         message_count: 5,
@@ -60,8 +61,27 @@ describe("ChatSidebar", () => {
 
     render(<ChatSidebar {...defaultProps} sessions={sessions} />);
 
-    expect(screen.getByText("Диалог")).toBeInTheDocument();
+    expect(screen.getByText("Подбор авто до 2 млн")).toBeInTheDocument();
     expect(screen.getByText("5 сообщ.")).toBeInTheDocument();
+  });
+
+  it("shows default title when session has no title", () => {
+    const sessions: ChatSessionListItem[] = [
+      {
+        id: "s1",
+        status: "active",
+        created_at: "2024-01-01T00:00:00Z",
+        updated_at: "2024-01-01T00:00:00Z",
+        message_count: 1,
+      },
+    ];
+
+    render(<ChatSidebar {...defaultProps} sessions={sessions} />);
+
+    const sessionButton = screen.getByRole("button", {
+      name: /новый диалог.*1 сообщ/i,
+    });
+    expect(sessionButton).toBeInTheDocument();
   });
 
   it("calls onSelectSession when session clicked", async () => {
@@ -71,6 +91,7 @@ describe("ChatSidebar", () => {
       {
         id: "s1",
         status: "active",
+        title: "Чат",
         created_at: "2024-01-01T00:00:00Z",
         updated_at: "2024-01-01T00:00:00Z",
         message_count: 3,
@@ -87,7 +108,7 @@ describe("ChatSidebar", () => {
     );
 
     const sessionButton = screen.getByRole("button", {
-      name: /диалог.*3 сообщ/i,
+      name: /чат.*3 сообщ/i,
     });
     await user.click(sessionButton);
 
@@ -99,6 +120,7 @@ describe("ChatSidebar", () => {
       {
         id: "s1",
         status: "active",
+        title: "Текущий",
         created_at: "2024-01-01T00:00:00Z",
         updated_at: "2024-01-01T00:00:00Z",
         message_count: 2,
@@ -114,8 +136,56 @@ describe("ChatSidebar", () => {
     );
 
     const sessionButton = screen.getByRole("button", {
-      name: /диалог.*2 сообщ/i,
+      name: /текущий.*2 сообщ/i,
     });
     expect(sessionButton.className).toMatch(/sessionItemActive|active/i);
+  });
+
+  it("calls onDeleteSession when delete button clicked", async () => {
+    const user = userEvent.setup();
+    const onDeleteSession = vi.fn();
+    const sessions: ChatSessionListItem[] = [
+      {
+        id: "s1",
+        status: "active",
+        title: "Удаляемый",
+        created_at: "2024-01-01T00:00:00Z",
+        updated_at: "2024-01-01T00:00:00Z",
+        message_count: 1,
+      },
+    ];
+
+    render(
+      <ChatSidebar
+        {...defaultProps}
+        sessions={sessions}
+        onDeleteSession={onDeleteSession}
+      />
+    );
+
+    const deleteBtn = screen.getByRole("button", { name: /удалить диалог/i });
+    await user.click(deleteBtn);
+
+    expect(onDeleteSession).toHaveBeenCalledTimes(1);
+    expect(onDeleteSession).toHaveBeenCalledWith("s1");
+  });
+
+  it("does not show delete button when onDeleteSession is not passed", () => {
+    const sessions: ChatSessionListItem[] = [
+      {
+        id: "s1",
+        status: "active",
+        title: "Без удаления",
+        created_at: "2024-01-01T00:00:00Z",
+        updated_at: "2024-01-01T00:00:00Z",
+        message_count: 1,
+      },
+    ];
+
+    render(<ChatSidebar {...defaultProps} sessions={sessions} />);
+
+    expect(
+      screen.queryByRole("button", { name: /удалить диалог/i })
+    ).not.toBeInTheDocument();
   });
 });

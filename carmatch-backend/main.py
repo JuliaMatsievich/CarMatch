@@ -1,15 +1,24 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.config import settings
-from src.routers import auth, chat
+from src.routers import auth, chat, chat_sessions, cars
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 
 app = FastAPI(
     title="CarMatch API",
     version="1.0.0",
     openapi_tags=[
         {"name": "auth", "description": "Регистрация и вход"},
-        {"name": "chat", "description": "Чат с GigaChat"},
+        {"name": "chat", "description": "Чат с DeepSeek (свободный и сессии подбора авто)"},
+        {"name": "cars", "description": "Поиск автомобилей"},
     ],
 )
 
@@ -23,6 +32,8 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
+app.include_router(chat_sessions.router, prefix="/api/v1")
+app.include_router(cars.router, prefix="/api/v1")
 
 
 @app.on_event("startup")

@@ -33,7 +33,7 @@ API: http://localhost:8000
 
 ### GigaChat (чат)
 
-Чтобы работал эндпоинт `POST /api/v1/chat/complete`, в `.env` задайте ключ авторизации GigaChat:
+Чтобы работал эндпоинт свободного чата `POST /api/v1/chat/complete`, в `.env` задайте ключ авторизации GigaChat:
 
 ```env
 GIGACHAT_CREDENTIALS=<ключ из https://developers.sber.ru/studio/>

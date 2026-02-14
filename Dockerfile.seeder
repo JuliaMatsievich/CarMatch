@@ -1,0 +1,45 @@
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the project files
+COPY carmatch-backend/requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the project files
+COPY carmatch-backend/src/ ./src/
+COPY carmatch-backend/alembic/ ./alembic/
+COPY cars.xml ./cars.xml
+COPY carmatch-backend/src/utils/xml_seeder.py ./src/utils/xml_seeder.py
+
+# Create a simple script to run the seeder
+RUN echo '#!/usr/bin/env python3' > run_seeder.py
+RUN echo 'import sys' >> run_seeder.py
+RUN echo 'sys.path.insert(0, "/app")' >> run_seeder.py
+RUN echo '' >> run_seeder.py
+RUN echo 'from src.utils.xml_seeder import parse_xml_and_seed_database' >> run_seeder.py
+RUN echo '' >> run_seeder.py
+RUN echo 'if __name__ == "__main__":' >> run_seeder.py
+RUN echo '    print("Starting database seeding process...")' >> run_seeder.py
+RUN echo '    xml_file_path = "/app/cars.xml"' >> run_seeder.py
+RUN echo '    print(f"Using XML file: {xml_file_path}")' >> run_seeder.py
+RUN echo '    try:' >> run_seeder.py
+RUN echo '        parse_xml_and_seed_database(xml_file_path)' >> run_seeder.py
+RUN echo '        print("Seeding completed successfully!")' >> run_seeder.py
+RUN echo '    except Exception as e:' >> run_seeder.py
+RUN echo '        print(f"Error during seeding: {str(e)}")' >> run_seeder.py
+RUN echo '        import traceback' >> run_seeder.py
+RUN echo '        traceback.print_exc()' >> run_seeder.py
+RUN echo '        sys.exit(1)' >> run_seeder.py
+
+# Make the script executable
+RUN chmod +x run_seeder.py
+
+CMD ["python", "run_seeder.py"]

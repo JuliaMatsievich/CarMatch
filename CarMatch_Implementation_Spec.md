@@ -2,6 +2,21 @@
 
 Документ предназначен для реализации онлайн-сервиса CarMatch кодинг-агентами (Cursor, Claude, GPT). Каждая секция содержит однозначные контракты и атомарные задачи.
 
+## Структура документа (соответствие чеклисту ревью)
+
+| № | Раздел | Содержание |
+|---|--------|------------|
+| 1 | Executive Summary | Задача, ограничения, допущения, стек, безопасность |
+| 2 | Архитектурные диаграммы | Flowchart системы, sequence-диаграмма, ER-модель |
+| 3 | Структура компонентов | Frontend и Backend: ответственность, входы/выходы, файлы, зависимости |
+| 4 | API и интерфейсы | Auth, чат-сессии, поиск авто: request/response, коды ошибок, TypeScript-типы |
+| 5 | Модель данных | DDL таблиц, связи, каскады, индексы |
+| 6 | План реализации | Атомарные задачи Backend (B1–B15) и Frontend (F1–F16) |
+| 7 | Acceptance Criteria | Проверяемые критерии приёмки |
+| 8 | Риски и альтернативы | Митигации и варианты при изменении требований |
+| 9 | Замечания и доп. требования | Практики, справочники, логика чата, промпты |
+| — | Ревью архитектора-критика | Вердикт, замечания, рекомендации (см. конец документа) |
+
 ---
 
 ## 1. Executive Summary
@@ -11,7 +26,7 @@
 **Ключевые ограничения:**
 - Обязательная регистрация/авторизация; гостевой режим не предусмотрен.
 - Каталог автомобилей для MVP — статический импорт из Yandex Auto Export (XML).
-- AI-инференс для MVP — Ollama с моделью Qwen2.5 (локально или в контейнере бэкенда).
+- AI-инференс для MVP — DeepSeek API (модель deepseek-chat) через OpenAI-совместимый клиент.
 - Язык интерфейса и диалога — русский.
 
 **Допущения:**
@@ -38,7 +53,7 @@
 | Backend | SQLAlchemy | 2.0 |
 | Backend | Alembic | 1.x |
 | Backend | PostgreSQL | 15+ |
-| Backend | Ollama + Qwen2.5 | — |
+| Backend | DeepSeek API (deepseek-chat) + openai SDK | — |
 | Auth | JWT, bcrypt | — |
 
 ---
@@ -57,12 +72,12 @@ flowchart LR
     end
     subgraph Back["Backend"]
         API[FastAPI API]
-        Ollama[Ollama Qwen2.5]
+        DeepSeek[DeepSeek API]
         DB[(PostgreSQL)]
     end
     Browser --> Vercel
-    Browser -->|HTTPS/REST + WSS| API
-    API --> Ollama
+    Browser -->|HTTPS/REST| API
+    API -->|OpenAI SDK| DeepSeek
     API --> DB
 ```
 
@@ -73,7 +88,7 @@ sequenceDiagram
     participant U as User
     participant F as Frontend
     participant A as API
-    participant O as Ollama
+    participant DS as DeepSeek API
     participant D as DB
 
     U->>F: Открывает сайт
@@ -84,13 +99,13 @@ sequenceDiagram
     A->>F: 201 { access_token, user }
     F->>F: Сохранить token, переход в /chat
     U->>F: Ввод сообщения в чат
-    F->>A: POST /api/v1/chat/sessions (если нет session_id)
-    A->>D: INSERT session
-    A->>F: 201 { session_id }
+    F->>A: GET /api/v1/chat/sessions/current (если нет session_id)
+    A->>D: SELECT / INSERT session
+    A->>F: 200 { session }
     F->>A: POST /api/v1/chat/sessions/{id}/messages
     A->>D: INSERT chat_message (user)
-    A->>O: Запрос с историей + system prompt
-    O->>A: JSON { response, extracted_params, ready_for_search }
+    A->>DS: Запрос с историей + system prompt (OpenAI SDK)
+    DS->>A: JSON { response, extracted_params, ready_for_search }
     A->>D: INSERT chat_message (assistant)
     A->>F: 200 { message, extracted_params, ready_for_search }
     alt ready_for_search && 3+ params
@@ -124,6 +139,7 @@ erDiagram
         uuid id PK
         int user_id FK
         varchar status
+        varchar title
         jsonb extracted_params
         jsonb search_criteria
         jsonb search_results
@@ -145,6 +161,62 @@ erDiagram
         timestamp created_at
     }
 
+    car_brands ||--o{ car_models : "has"
+    car_models ||--o{ car_generations : "has"
+    car_generations ||--o{ car_modifications : "has"
+    car_modifications ||--o{ car_complectations : "has"
+
+    car_brands ||--o{ cars : "referenced by"
+    car_models ||--o{ cars : "referenced by"
+    car_generations ||--o{ cars : "referenced by"
+    car_modifications ||--o{ cars : "referenced by"
+
+    car_brands {
+        int id PK
+        varchar name UK
+        varchar code
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    car_models {
+        int id PK
+        int brand_id FK
+        varchar name
+        varchar external_id
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    car_generations {
+        int id PK
+        int model_id FK
+        varchar name
+        varchar external_id
+        jsonb years
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    car_modifications {
+        int id PK
+        int generation_id FK
+        varchar name
+        varchar external_id
+        varchar body_type
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    car_complectations {
+        int id PK
+        int modification_id FK
+        varchar name
+        varchar external_id
+        timestamp created_at
+        timestamp updated_at
+    }
+
     cars {
         int id PK
         varchar source
@@ -160,9 +232,14 @@ erDiagram
         varchar transmission
         jsonb specs
         text[] images
+        text description
         bool is_active
         timestamp imported_at
         timestamp updated_at
+        int brand_id FK
+        int model_id FK
+        int generation_id FK
+        int modification_id FK
     }
 
     search_parameters {
@@ -193,7 +270,7 @@ erDiagram
 | **CarResults** | Карточки подобранных автомобилей (марка, модель, год, цена, фото) | `cars[]` из API | Рендер сетки карточек | `src/components/CarResults/CarResults.tsx`, `CarCard.tsx` | — |
 | **authApi** | Регистрация, логин; возврат access_token и user. Вызывающий код (AuthPage) передаёт результат в AuthContext.login/register — сохранение token в state и localStorage выполняет только AuthContext | `email`, `password` | Promise<{ access_token, user }> | `src/api/auth.ts` | API client (axios), env VITE_API_BASE_URL |
 | **chatApi** | Создание сессии, отправка сообщения, получение истории сообщений | `sessionId?`, `content?` | Promise<session \| message \| messages[]> | `src/api/chat.ts` | API client (токен подставляется интерцептором из AuthContext) |
-| **carsApi** | Поиск автомобилей по query-параметрам | `params: { budget_max?, body_type?, ... }` | Promise<{ count, results }> | `src/api/cars.ts` | API client |
+| **carsApi** | Поиск автомобилей по query-параметрам | `params: { brand?, model?, body_type?, limit? }` | Promise<{ count, results }> | `src/api/cars.ts` | API client |
 | **AuthContext** | Единственный источник истины для token и user. При монтировании — восстановление token (и при необходимости user) из localStorage (ключ `carmatch_access_token`). Методы login/register сохраняют переданные access_token и user в state и в localStorage; logout очищает state и localStorage | — | Context: { user, token, login, logout, register } | `src/contexts/AuthContext.tsx` | React |
 | **App router** | Маршруты: /login → AuthPage; /chat, /chat/:sessionId? → ProtectedRoute → ChatLayout | — | Router с маршрутами | `src/App.tsx` | React Router |
 
@@ -203,10 +280,11 @@ erDiagram
 |-----------|-----------------|-------|--------|------------|-------------|
 | **auth router** | POST /register, POST /login; выдача JWT | Body: email, password | 201/400/422 + access_token, user | `src/routers/auth.py` | FastAPI, schemas, auth service |
 | **auth service** | Хеширование пароля (bcrypt), проверка пароля, создание JWT | email, password (plain) | User + token или None | `src/services/auth.py` | bcrypt, jwt, database |
-| **chat router** | POST /chat/sessions, POST /chat/sessions/{id}/messages, GET /chat/sessions/{id}/messages, GET /chat/sessions | JWT, body/path | 201/200 + session или message(s) | `src/routers/chat.py` | FastAPI, get_current_user, chat service, ollama client |
-| **chat service** | Создание сессии, добавление сообщения user, вызов Ollama, сохранение ответа assistant, обновление extracted_params в session | user_id, session_id, content | Session, Message | `src/services/chat.py` | database, ollama client |
-| **ollama client** | Запрос к Ollama API с system prompt и историей; парсинг JSON ответа (response, extracted_params, ready_for_search) | messages[], system_prompt | dict с response, extracted_params, ready_for_search | `src/services/ollama_client.py` | httpx, OLLAMA_URL |
-| **cars router** | GET /cars/search с query-параметрами; фильтрация по БД | Query: budget_max, body_type, min_year, fuel_type, limit | 200 { count, results } | `src/routers/cars.py` | FastAPI, get_current_user, database |
+| **chat router** | POST /chat/complete — свободный чат с DeepSeek (без сессий) | JWT, body: messages[] | 200 + content | `src/routers/chat.py` | FastAPI, get_current_user, deepseek service |
+| **chat_sessions router** | POST /chat/sessions, GET /chat/sessions, GET /chat/sessions/current, POST /chat/sessions/{id}/messages, GET /chat/sessions/{id}/messages, DELETE /chat/sessions/{id} | JWT, body/path | 201/200/204 + session или message(s) | `src/routers/chat_sessions.py` | FastAPI, get_current_user, chat service |
+| **chat service** | Создание сессии, двухшаговая логика добавления сообщения: (1) extract_params через LLM с передачей справочника body_type из БД; (2) поиск в БД если ≥3 параметра, затем generate_response через LLM; сохранение ответа assistant, обновление extracted_params, логирование всех этапов, автоназвание сессии | user_id, session_id, content | Session, Message | `src/services/chat.py` | database, deepseek service, car reference service |
+| **deepseek service** | Два LLM-запроса: (1) extract_params — извлечение параметров (brand, model, body_type) из истории с передачей справочника body_type из БД; (2) generate_response — генерация текста ответа пользователю по собранным параметрам и результатам поиска | messages[], params, body_type_reference, search_results | dict с extracted_params; str с текстом ответа | `src/services/deepseek.py` | openai SDK, DEEPSEEK_API_KEY |
+| **cars router** | GET /cars/search с query-параметрами из справочников; фильтрация по БД через `brand_id`, `model_id`, `body_type` | Query: brand, model, body_type, limit | 200 { count, results } | `src/routers/cars.py` | FastAPI, get_current_user, database, car_brands, car_models |
 | **users/cars/sessions/models** | SQLAlchemy модели для users, cars, sessions, chat_messages, search_parameters | — | — | `src/models.py` | SQLAlchemy |
 | **schemas** | Pydantic-модели для request/response | — | — | `src/schemas.py` | Pydantic |
 | **database** | Подключение к PostgreSQL, session factory | DATABASE_URL | Session | `src/database.py` | SQLAlchemy, os |
@@ -339,7 +417,37 @@ interface ChatSession {
 }
 ```
 
-Список только сессий текущего пользователя, упорядоченный по `updated_at` DESC.
+Список только сессий текущего пользователя, упорядоченный по `updated_at` DESC. Каждый элемент включает поле `title` — автоматически формируемый заголовок из первого сообщения пользователя (до 60 символов).
+
+**TypeScript (элемент списка):**
+```ts
+interface ChatSessionListItem {
+  id: string;
+  status: string;
+  title?: string | null;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+}
+```
+
+---
+
+#### GET /api/v1/chat/sessions/current
+
+Возвращает «текущий новый диалог» — последнюю пустую сессию пользователя (message_count = 0). Если пустых сессий нет — создаёт новую. Используется фронтендом при открытии /chat без sessionId для автоматического перехода в актуальную сессию.
+
+**Response 200:** тот же формат что и ChatSessionResponse.
+
+---
+
+#### DELETE /api/v1/chat/sessions/{session_id}
+
+Удаляет сессию текущего пользователя. Сообщения и search_parameters удаляются каскадно.
+
+**Response 204:** тело пустое.
+
+**Коды ошибок:** 404 (сессия не найдена или не принадлежит пользователю), 401 (нет токена).
 
 ---
 
@@ -348,7 +456,7 @@ interface ChatSession {
 **Request:**
 ```json
 {
-  "content": "Нужна машина для города до 2 миллионов"
+  "content": "Хочу Toyota, внедорожник"
 }
 ```
 
@@ -358,17 +466,18 @@ interface ChatSession {
   "id": 123,
   "session_id": "uuid",
   "role": "assistant",
-  "content": "Понял! Какой тип кузова предпочитаете: седан, хэтчбек, внедорожник?",
+  "content": "Отлично, Toyota — хороший выбор! Какую модель рассматриваете?",
   "sequence_order": 2,
   "created_at": "...",
   "extracted_params": [
-    { "type": "budget_max", "value": "2000000", "confidence": 0.95 }
+    { "type": "brand", "value": "Toyota", "confidence": 0.95 },
+    { "type": "body_type", "value": "внедорожник 5 дв.", "confidence": 0.9 }
   ],
   "ready_for_search": false
 }
 ```
 
-После сохранения сообщения пользователя бэкенд вызывает Ollama, сохраняет ответ assistant и возвращает его вместе с извлечёнными параметрами и флагом `ready_for_search`. Если `ready_for_search === true` и параметров достаточно (например, ≥3), фронтенд может вызвать GET /cars/search.
+После сохранения сообщения пользователя бэкенд вызывает DeepSeek API, сохраняет ответ assistant и возвращает его вместе с извлечёнными параметрами и флагом `ready_for_search`. Если `ready_for_search === true` и параметров достаточно (≥3), фронтенд вызывает GET /cars/search.
 
 **Коды ошибок:** 404 (сессия не найдена или не принадлежит пользователю), 422 (пустой content).
 
@@ -424,20 +533,60 @@ interface SendMessageResponse {
 
 ---
 
-### 4.3. Поиск автомобилей
+### 4.3. Свободный чат (без сессий)
+
+#### POST /api/v1/chat/complete
+
+Отправляет историю сообщений в DeepSeek и возвращает ответ ассистента. Свободный режим без привязки к сессиям и БД автомобилей.
+
+**Request:**
+```json
+{
+  "messages": [
+    { "role": "user", "content": "Привет! Расскажи про электромобили" }
+  ]
+}
+```
+
+**Response 200:**
+```json
+{
+  "content": "Электромобили — это транспортные средства с электродвигателем..."
+}
+```
+
+**Коды ошибок:** 401 (нет токена), 502 (ошибка DeepSeek API), 503 (DEEPSEEK_API_KEY не задан).
+
+**TypeScript:**
+```ts
+interface ChatCompleteMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+interface ChatCompleteRequest {
+  messages: ChatCompleteMessage[];
+}
+interface ChatCompleteResponse {
+  content: string;
+}
+```
+
+---
+
+### 4.4. Поиск автомобилей
 
 #### GET /api/v1/cars/search
 
+Поиск ведётся по параметрам из справочников БД (см. раздел 9.3). Тип кузова — по точному значению из справочника `car_modifications.body_type`; марка и модель — текстовым поиском через справочники `car_brands` и `car_models` с получением `brand_id` / `model_id`.
+
 **Query-параметры:**
 
-| Параметр | Тип | Обязательный | Описание |
-|----------|-----|--------------|----------|
-| budget_max | number | нет | Максимальная цена (руб.) |
-| body_type | string | нет | Седан, suv, хэтчбек, универсал и т.д. |
-| min_year | number | нет | Минимальный год выпуска |
-| fuel_type | string | нет | Бензин, дизель, гибрид, электро |
-| transmission | string | нет | Автомат, механика |
-| limit | number | нет | Макс. количество (по умолчанию 10, макс. 50) |
+| Параметр | Тип | Обязательный | Описание | Способ поиска |
+|----------|-----|--------------|----------|---------------|
+| brand | string | нет | Марка (Toyota, BMW, Lada…) | Текстовый поиск по `car_brands.name` → `cars.brand_id` |
+| model | string | нет | Модель (Camry, X5, Vesta…) | Текстовый поиск по `car_models.name` → `cars.model_id` |
+| body_type | string | нет | Тип кузова (седан, внедорожник, хэтчбек…) | Точное значение из справочника `car_modifications.body_type` |
+| limit | number | нет | Макс. количество (по умолчанию 10, макс. 50) | — |
 
 **Response 200:**
 ```json
@@ -449,13 +598,14 @@ interface SendMessageResponse {
       "mark_name": "Toyota",
       "model_name": "RAV4",
       "year": 2022,
-      "price_rub": 2100000,
-      "body_type": "suv",
-      "fuel_type": "hybrid",
-      "transmission": "автомат",
-      "images": ["https://..."],
+      "body_type": "внедорожник 5 дв.",
+      "brand_id": 42,
+      "model_id": 318,
+      "generation_id": 1205,
+      "modification_id": 5410,
+      "images": [],
       "engine_volume": 2.5,
-      "horsepower": 218
+      "horsepower": 199
     }
   ]
 }
@@ -464,25 +614,27 @@ interface SendMessageResponse {
 **TypeScript:**
 ```ts
 interface CarSearchParams {
-  budget_max?: number;
+  brand?: string;
+  model?: string;
   body_type?: string;
-  min_year?: number;
-  fuel_type?: string;
-  transmission?: string;
   limit?: number;
 }
 interface CarResult {
   id: number;
   mark_name: string;
   model_name: string;
-  year: number;
-  price_rub: number;
+  year: number | null;
+  price_rub: number | null;
   body_type: string | null;
   fuel_type: string | null;
   transmission: string | null;
   images: string[];
   engine_volume?: number;
   horsepower?: number;
+  brand_id?: number;
+  model_id?: number;
+  generation_id?: number;
+  modification_id?: number;
 }
 interface CarSearchResponse {
   count: number;
@@ -494,7 +646,7 @@ interface CarSearchResponse {
 
 ---
 
-### 4.4. Примеры запросов (curl)
+### 4.5. Примеры запросов (curl)
 
 ```bash
 # Регистрация
@@ -513,8 +665,8 @@ curl -X POST "http://localhost:8000/api/v1/chat/sessions/SESSION_ID/messages" \
   -H "Content-Type: application/json" \
   -d '{"content":"Машина для города до 2 млн"}'
 
-# Поиск авто
-curl "http://localhost:8000/api/v1/cars/search?budget_max=2000000&limit=5" \
+# Поиск авто (по справочным параметрам)
+curl "http://localhost:8000/api/v1/cars/search?brand=Toyota&body_type=внедорожник+5+дв.&limit=5" \
   -H "Authorization: Bearer TOKEN"
 ```
 
@@ -548,6 +700,7 @@ CREATE TABLE sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'completed', 'cancelled', 'error')),
+    title VARCHAR(200),
     extracted_params JSONB DEFAULT '{}',
     search_criteria JSONB DEFAULT '{}',
     search_results JSONB DEFAULT '[]',
@@ -601,18 +754,22 @@ CREATE TABLE cars (
     mark_name VARCHAR(100) NOT NULL,
     model_name VARCHAR(100) NOT NULL,
     body_type VARCHAR(50),
-    year INTEGER CHECK (year BETWEEN 1990 AND EXTRACT(YEAR FROM NOW()) + 1),
-    price_rub DECIMAL(12,2) CHECK (price_rub > 0),
+    year INTEGER,
+    price_rub DECIMAL(12,2),
     fuel_type VARCHAR(30),
     engine_volume DECIMAL(4,2),
     horsepower INTEGER,
     transmission VARCHAR(30),
-    specs JSONB DEFAULT '{}',
+    specs JSONB NOT NULL DEFAULT '{}'::jsonb,
     images TEXT[],
     description TEXT,
-    is_active BOOLEAN DEFAULT true,
-    imported_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    imported_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    brand_id INTEGER REFERENCES car_brands(id) ON DELETE SET NULL,
+    model_id INTEGER REFERENCES car_models(id) ON DELETE SET NULL,
+    generation_id INTEGER REFERENCES car_generations(id) ON DELETE SET NULL,
+    modification_id INTEGER REFERENCES car_modifications(id) ON DELETE SET NULL
 );
 CREATE INDEX idx_cars_mark_model ON cars(mark_name, model_name);
 CREATE INDEX idx_cars_year ON cars(year);
@@ -620,6 +777,86 @@ CREATE INDEX idx_cars_price ON cars(price_rub);
 CREATE INDEX idx_cars_body_type ON cars(body_type);
 CREATE INDEX idx_cars_fuel_type ON cars(fuel_type);
 CREATE INDEX idx_cars_is_active ON cars(is_active) WHERE is_active = true;
+CREATE INDEX idx_cars_brand ON cars(brand_id);
+CREATE INDEX idx_cars_model ON cars(model_id);
+CREATE INDEX idx_cars_generation ON cars(generation_id);
+CREATE INDEX idx_cars_modification ON cars(modification_id);
+```
+
+**car_brands**
+```sql
+CREATE TABLE car_brands (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    code VARCHAR(50),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX ix_car_brands_id ON car_brands(id);
+CREATE INDEX idx_car_brands_name ON car_brands(name);
+```
+
+**car_models**
+```sql
+CREATE TABLE car_models (
+    id SERIAL PRIMARY KEY,
+    brand_id INTEGER NOT NULL REFERENCES car_brands(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    external_id VARCHAR(100),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX ix_car_models_id ON car_models(id);
+CREATE INDEX idx_car_models_brand ON car_models(brand_id);
+CREATE INDEX idx_car_models_name ON car_models(name);
+CREATE INDEX idx_car_models_external_id ON car_models(external_id);
+```
+
+**car_generations**
+```sql
+CREATE TABLE car_generations (
+    id SERIAL PRIMARY KEY,
+    model_id INTEGER NOT NULL REFERENCES car_models(id) ON DELETE CASCADE,
+    name VARCHAR(100),
+    external_id VARCHAR(100),
+    years JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX ix_car_generations_id ON car_generations(id);
+CREATE INDEX idx_car_generations_model ON car_generations(model_id);
+CREATE INDEX idx_car_generations_external_id ON car_generations(external_id);
+```
+
+**car_modifications**
+```sql
+CREATE TABLE car_modifications (
+    id SERIAL PRIMARY KEY,
+    generation_id INTEGER NOT NULL REFERENCES car_generations(id) ON DELETE CASCADE,
+    name VARCHAR(200) NOT NULL,
+    external_id VARCHAR(100),
+    body_type VARCHAR(100),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX ix_car_modifications_id ON car_modifications(id);
+CREATE INDEX idx_car_modifications_generation ON car_modifications(generation_id);
+CREATE INDEX idx_car_modifications_external_id ON car_modifications(external_id);
+```
+
+**car_complectations**
+```sql
+CREATE TABLE car_complectations (
+    id SERIAL PRIMARY KEY,
+    modification_id INTEGER NOT NULL REFERENCES car_modifications(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    external_id VARCHAR(100),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX ix_car_complectations_id ON car_complectations(id);
+CREATE INDEX idx_car_complectations_modification ON car_complectations(modification_id);
+CREATE INDEX idx_car_complectations_external_id ON car_complectations(external_id);
 ```
 
 ### 5.2. Связи и каскады
@@ -635,7 +872,7 @@ CREATE INDEX idx_cars_is_active ON cars(is_active) WHERE is_active = true;
 
 ### Backend
 
-- [ ] **B1.** Создать `carmatch-backend/requirements.txt` с зависимостями: fastapi, uvicorn, sqlalchemy>=2.0, alembic, psycopg2-binary, pydantic, pydantic-settings, python-jose[cryptography], passlib[bcrypt], httpx, python-multipart.
+- [ ] **B1.** Создать `carmatch-backend/requirements.txt` с зависимостями: fastapi, uvicorn[standard], sqlalchemy>=2.0, alembic, psycopg[binary]>=3.1 (драйвер psycopg3), pydantic[email], pydantic-settings, email-validator, python-jose[cryptography], bcrypt, python-multipart, openai>=1.0.0 (для DeepSeek API), pytest, httpx.
 - [ ] **B2.** Создать `carmatch-backend/src/database.py`: подключение к PostgreSQL по переменной окружения DATABASE_URL, создание engine и sessionmaker (SessionLocal), контекстный менеджер get_db().
 - [ ] **B3.** Создать `carmatch-backend/src/models.py`: модели SQLAlchemy для User, Session, ChatMessage, Car, SearchParameter с полями и связями по разделу 5.
 - [ ] **B4.** Создать первую миграцию Alembic: добавление таблиц users, sessions, chat_messages, cars, search_parameters. Команда: `alembic revision --autogenerate -m "initial"`, затем `alembic upgrade head`.
@@ -644,11 +881,12 @@ CREATE INDEX idx_cars_is_active ON cars(is_active) WHERE is_active = true;
 - [ ] **B7.** Создать `carmatch-backend/src/deps.py`: зависимость get_current_user(credentials: HTTPAuthorizationCredentials, db: Session) — извлечение JWT из Bearer, верификация подписи и срока действия, загрузка User из БД по id из payload; при отсутствии/невалидном токене или несуществующем пользователе — HTTPException 401 с сообщением «Неверный или истёкший токен» (или аналог).
 - [ ] **B8.** Создать `carmatch-backend/src/routers/auth.py`: POST /api/v1/auth/register и POST /api/v1/auth/login; вызов auth service; при регистрации: если email уже занят — 400 с detail «Email уже зарегистрирован»; при нарушении валидации Pydantic — 422 с detail из FastAPI; при успехе — 201 и AuthResponse. При логине: при неверном email или пароле — 401 с detail «Неверный email или пароль»; при 422 — как для register; при успехе — 200 и AuthResponse.
 - [ ] **B9.** Создать `carmatch-backend/main.py`: экземпляр FastAPI, CORS middleware (разрешить origin фронтенда), подключение роутеров auth и (ниже) chat, cars; точка входа uvicorn.
-- [ ] **B10.** Создать `carmatch-backend/src/services/ollama_client.py`: функция get_ollama_response(messages: list[dict], system_prompt: str) -> dict. POST к OLLAMA_URL (например http://localhost:11434/api/chat) с телом { "model": "qwen2.5", "messages": [...], "stream": false }. В ответе парсить JSON от модели (response, extracted_params, ready_for_search); при отсутствии полей — задать значения по умолчанию. System prompt — из константы или конфига (текст из раздела 5.1 CarMatch_doc.md).
-- [ ] **B11.** Создать `carmatch-backend/src/services/chat.py`: create_session(db, user_id) → Session; add_message(db, session_id, user_id, content) → (Message, assistant_message, extracted_params, ready_for_search): сохранить user message, вызвать ollama_client с историей сообщений сессии, сохранить assistant message, обновить session.extracted_params и при необходимости search_results, вернуть assistant message и метаданные.
-- [ ] **B12.** Создать `carmatch-backend/src/routers/chat.py`: POST /api/v1/chat/sessions (get_current_user), GET /api/v1/chat/sessions, POST /api/v1/chat/sessions/{session_id}/messages (body: content), GET /api/v1/chat/sessions/{session_id}/messages; проверка владения сессией пользователем.
-- [ ] **B13.** Создать `carmatch-backend/src/routers/cars.py`: GET /api/v1/cars/search с query-параметрами budget_max, body_type, min_year, fuel_type, transmission, limit; фильтрация по таблице cars (is_active=true), сортировка (например по price_rub ASC), limit по умолчанию 10, макс. 50; ответ в формате { count, results }.
-- [ ] **B14.** Подключить роутеры chat и cars в main.py под префиксом /api/v1.
+- [ ] **B10.** Создать `carmatch-backend/src/services/deepseek.py`: OpenAI-совместимый клиент для DeepSeek API (base_url=https://api.deepseek.com, model=deepseek-chat). Функции: (a) `chat_complete(messages)` — свободный чат; (b) `extract_params(messages, current_params, body_type_reference)` — Шаг 1: извлечение параметров подбора (brand, model, body_type) из истории диалога, с передачей справочника body_type из БД; (c) `generate_response(messages, params, search_results)` — Шаг 2: генерация текстового ответа пользователю на основе собранных параметров и результатов поиска. DEEPSEEK_API_KEY берётся из env через Settings. Промпты — в константах модуля.
+- [ ] **B11.** Создать `carmatch-backend/src/services/chat.py`: create_session(db, user_id) → Session; add_message(db, session_id, user_id, content) — двухшаговая логика: (Шаг 1) сохранить user message, при первом сообщении задать session.title, вызвать deepseek.extract_params с историей и справочником body_type из БД → получить параметры (brand, model, body_type); (Шаг 2) если ≥3 параметра — выполнить поиск в БД, затем вызвать deepseek.generate_response с параметрами и результатами поиска; если <3 — вызвать deepseek.generate_response с просьбой задать уточняющие вопросы. Сохранить assistant message, обновить session.extracted_params, записать search_parameters. Логировать все этапы в metadata сообщений.
+- [ ] **B12a.** Создать `carmatch-backend/src/routers/chat.py`: POST /api/v1/chat/complete — свободный чат с DeepSeek (без сессий и БД машин); вызов deepseek.chat_complete.
+- [ ] **B12b.** Создать `carmatch-backend/src/routers/chat_sessions.py`: POST /api/v1/chat/sessions, GET /api/v1/chat/sessions, GET /api/v1/chat/sessions/current, POST /api/v1/chat/sessions/{session_id}/messages, GET /api/v1/chat/sessions/{session_id}/messages, DELETE /api/v1/chat/sessions/{session_id}; проверка владения сессией пользователем.
+- [ ] **B13.** Создать `carmatch-backend/src/routers/cars.py`: GET /api/v1/cars/search с query-параметрами brand, model, body_type, limit; поиск марки и модели — текстовый через справочники car_brands и car_models → получение brand_id / model_id → фильтрация cars; тип кузова — по точному значению из справочника car_modifications.body_type; только is_active=true; limit по умолчанию 10, макс. 50; ответ в формате { count, results }.
+- [ ] **B14.** Подключить роутеры auth, chat, chat_sessions и cars в main.py под префиксом /api/v1.
 - [ ] **B15.** Реализовать скрипт или команду импорта каталога из Yandex Auto Export XML в таблицу cars (парсинг XML, маппинг полей, batch insert). URL XML: https://auto-export.s3.yandex.net/auto/price-list/catalog/cars.xml (или локальный файл cars.xml).
 
 ### Frontend
@@ -661,7 +899,7 @@ CREATE INDEX idx_cars_is_active ON cars(is_active) WHERE is_active = true;
 - [ ] **F6.** Создать `src/contexts/AuthContext.tsx`: единственный источник истины для token и user. При монтировании провайдера — восстановление token из localStorage (ключ `carmatch_access_token`); при необходимости восстанавливать user из localStorage (ключ `carmatch_user`) или загружать по токену. Методы login(access_token, user), register(access_token, user) сохраняют переданные данные в state и в localStorage; logout очищает state и localStorage (и при использовании F2(b) — сбрасывает токен в client). Провайдер оборачивает приложение (например, корень Router).
 - [ ] **F7.** Создать `src/components/ProtectedRoute.tsx`: читать token только из AuthContext (useContext(AuthContext).token); при отсутствии token — <Navigate to="/login" replace />, иначе — <Outlet /> или children.
 - [ ] **F8.** Создать `src/pages/AuthPage.tsx`: форма с полями email и password; кнопки «Войти» и «Зарегистрироваться»; вызов authApi.login/register, при успехе — вызов AuthContext.login или AuthContext.register с access_token и user из ответа (AuthContext сам сохраняет в state и localStorage); затем редирект на /chat. Стили в AuthPage.module.css. Опционально: клиентская валидация пароля (минимум 8 символов) и формата email перед отправкой.
-- [ ] **F9.** Создать `src/pages/ChatPage.tsx`: при открытии /chat без sessionId — создать сессию через createSession() и редирект на /chat/:sessionId; при наличии sessionId — загрузка сообщений getMessages(sessionId), рендер ChatLayout с MessageList и MessageInput.
+- [ ] **F9.** Создать `src/pages/ChatPage.tsx`: при открытии /chat без sessionId — получить текущую пустую сессию через GET /chat/sessions/current (или создать новую) и редирект на /chat/:sessionId; при наличии sessionId — загрузка сообщений getMessages(sessionId), рендер ChatLayout с MessageList и MessageInput.
 - [ ] **F10.** Создать `src/components/ChatLayout/ChatLayout.tsx` и `ChatLayout.module.css`: сайдбар слева (список сессий + «Новый диалог» + «Выйти»), справа — область сообщений и поле ввода; пропсы: sessionId, sessions, messages, onNewChat, onSelectSession, onSend, onLogout.
 - [ ] **F11.** Создать `src/components/Chat/MessageList.tsx`: отображение сообщений по sequence_order; различие стилей для role user и assistant.
 - [ ] **F12.** Создать `src/components/Chat/MessageInput.tsx`: контролируемый input и кнопка «Отправить»; при отправке вызвать onSend(content), затем обновить список сообщений (через refetch или передачу нового сообщения в state).
@@ -680,9 +918,9 @@ CREATE INDEX idx_cars_is_active ON cars(is_active) WHERE is_active = true;
 - ✅ Пользователь может войти по email и паролю и получить JWT; при неверных данных возвращается 401 с сообщением «Неверный email или пароль» (без раскрытия, что именно неверно).
 - ✅ Без токена доступ к /chat и к API (кроме register/login) невозможен; фронтенд берёт токен из AuthContext и перенаправляет на /login при отсутствии токена.
 - ✅ После входа пользователь попадает в чат; при первом заходе создаётся новая сессия и отображается пустой список сообщений.
-- ✅ Пользователь вводит сообщение и нажимает «Отправить»; сообщение отображается в чате; ответ ассистента появляется после ответа API (с задержкой вызова Ollama).
+- ✅ Пользователь вводит сообщение и нажимает «Отправить»; сообщение отображается в чате; ответ ассистента появляется после ответа API (с задержкой вызова DeepSeek).
 - ✅ В ответе API сообщения присутствуют поля extracted_params и ready_for_search; при ready_for_search и достаточном числе параметров фронтенд показывает блок с результатами поиска автомобилей.
-- ✅ GET /cars/search с параметрами (budget_max, body_type и т.д.) возвращает список автомобилей из БД в формате { count, results }; результаты отображаются в виде карточек (марка, модель, год, цена, при наличии — фото).
+- ✅ GET /cars/search с параметрами (brand, model, body_type) возвращает список автомобилей из БД в формате { count, results }; поиск ведётся через справочники (car_brands, car_models, car_modifications); результаты отображаются в виде карточек со всеми известными характеристиками.
 - ✅ В сайдбаре отображается список сессий пользователя; можно создать «Новый диалог» и переключаться между сессиями; при выборе сессии подгружаются её сообщения.
 - ✅ Пользователь может выйти (logout); AuthContext очищает token и user из state и из localStorage; при использовании F2(b) токен сбрасывается и в API-клиенте; происходит редирект на /login.
 - ✅ Каталог автомобилей заполняется из Yandex Auto Export (или локального XML); поиск по фильтрам возвращает только активные записи cars.
@@ -694,16 +932,111 @@ CREATE INDEX idx_cars_is_active ON cars(is_active) WHERE is_active = true;
 | Риск | Митигация |
 |------|-----------|
 | Ограничения бесплатного хостинга (Render/Vercel/Supabase) | Мониторить лимиты; при достижении лимитов рассмотреть платный tier или перенос на другой провайдер. |
-| Долгий ответ Ollama (>4 сек) | Кэшировать типовые ответы; сократить длину контекста; в UI показывать индикатор загрузки. |
+| Долгий ответ DeepSeek API (>4 сек) | Кэшировать типовые ответы; сократить длину контекста; в UI показывать индикатор загрузки. |
 | Нестабильный формат JSON от LLM | Парсить ответ с fallback: при ошибке считать ready_for_search=false, extracted_params=[]; логировать сырой ответ для доработки промпта. |
+| Недоступность DeepSeek API | При ошибке от API возвращать пользователю сообщение «Не удалось обработать запрос. Попробуйте ещё раз.»; логировать ошибку. |
 | Нехватка данных в Yandex XML | Документировать маппинг полей; при отсутствии полей оставлять NULL; в будущем подключить Auto.dev API. |
 
 **Альтернативы при изменении требований:**
 
-- Замена Ollama на облачный LLM (OpenAI, Yandex GPT): вынести вызов в отдельный адаптер (например, `llm_client.py`) с интерфейсом get_response(messages, system_prompt); заменить реализацию внутри на вызов облачного API.
+- Замена DeepSeek на другой LLM (OpenAI, Yandex GPT и др.): благодаря использованию OpenAI-совместимого SDK достаточно изменить `base_url` и `model` в `deepseek.py`; для кардинально другого API — вынести вызов в отдельный адаптер с единым интерфейсом.
 - WebSocket вместо REST для чата: добавить эндпоинт WebSocket /ws/chat/{session_id}; фронтенд подключается к нему и отправляет сообщения через сокет; ответ ассистента приходит стримом или одним сообщением; текущий REST можно оставить для совместимости или удалить после миграции.
 - Гостевой режим: ввести анонимные сессии (user_id nullable или отдельная таблица guest_sessions); выдавать временный JWT или session_id без привязки к user; ограничить функционал для гостя (например, только один диалог).
 
 ---
 
-**Документ готов к использованию кодинг-агентами.** Рекомендуемый порядок реализации: Backend B1–B9 (инфраструктура и авторизация), Frontend F1–F8 и F15–F16 (вход и роутинг), затем B10–B15 и F9–F14 (чат, Ollama, поиск авто, UI чата и результатов).
+## 9. Замечания и дополнительные требования
+
+Ниже — замечания и уточнения к реализации (к выполнению при последующих итерациях).
+
+### 9.1. Общие практики
+
+- Использовать лучшие практики и подходы при разработке масштабируемых приложений на соответствующих фреймворках (FastAPI, React и др.).
+
+### 9.2. Справочник автомобилей и БД
+
+- В файле **cars.xml** в корне проекта лежит база-справочник автомобилей.
+- На её основе необходимо спроектировать **нормализованную БД** и затем в виде **сидера** прогнать все эти справочники в неё.
+
+### 9.3. Принцип работы чата (логика бэкенда)
+
+Пользователь пишет сообщение — оно отправляется на бэкенд.
+
+**Важно:** пока всё взаимодействие должно быть **синхронным**, без фоновых задач и очередей — для простоты отладки. При этом все ключевые этапы логики необходимо **инкапсулировать в отдельные функции**, чтобы в дальнейшем их можно было использовать для реализации асинхронного варианта.
+
+**Справочники, имеющиеся в БД (источник параметров для поиска):**
+
+| Таблица | Ключевые поля | Что содержит |
+|---------|---------------|--------------|
+| `car_brands` | `id`, `name`, `code` | Марки автомобилей (Toyota, BMW, Lada…) |
+| `car_models` | `id`, `brand_id`, `name` | Модели (Camry, X5, Vesta…) |
+| `car_generations` | `id`, `model_id`, `name`, `years` (JSONB) | Поколения с диапазоном годов |
+| `car_modifications` | `id`, `generation_id`, `name`, `body_type` | Модификации с типом кузова |
+| `car_complectations` | `id`, `modification_id`, `name` | Комплектации |
+
+**Параметры подбора, извлекаемые из диалога:**
+
+| Параметр | Источник в БД | Способ поиска |
+|----------|--------------|---------------|
+| **Тип кузова** | `car_modifications.body_type` | В LLM передавать **справочник уникальных значений body_type из БД**; просить подобрать значение строго по этому справочнику. Поиск по точному значению. |
+| **Марка** | `car_brands.name` | Просить LLM отдать название в **общепринятом виде**. Поиск — **текстовый** по `car_brands.name` → получение `brand_id` → фильтрация `cars.brand_id`. |
+| **Модель** | `car_models.name` | Просить LLM отдать название в **общепринятом виде**. Поиск — **текстовый** по `car_models.name` → получение `model_id` → фильтрация `cars.model_id`. |
+
+> **Примечание:** В справочниках нет бюджета, коробки передач, типа топлива и страны-производителя — эти параметры не участвуют в поиске. При необходимости в будущем можно добавить дополнительные справочные таблицы.
+
+**Основные шаги при получении вопроса пользователя:**
+
+1. **Шаг 1. Извлечение параметров подбора из истории переписки (LLM)**
+   По истории переписки при помощи LLM получаем в **структурированном виде** параметры подбора, которые заявил пользователь.
+   Нас интересуют параметры: **тип кузова**; **марка**; **модель**.
+   - Для **типа кузова** в LLM передавать **справочник из нашей БД** (уникальные значения `body_type` из таблицы `car_modifications`) и просить подобрать значение строго на основе этого справочника.
+   - Для **марки** и **модели** — просить отдать их название в общепринятом виде.
+
+2. **Шаг 2. Поиск и ответ**
+   - Если на Шаге 1 удалось **однозначно определить хотя бы 3 параметра** — используем их для запроса на поиск подходящей машины в нашей БД. Тип кузова ищем по **точному значению из справочника**, а марку и модель — **текстовым поиском** (через `car_brands.name` → `brand_id` и `car_models.name` → `model_id`).
+   - Если найдена **хотя бы одна** подходящая машина в БД — отвечаем пользователю в чат и сообщаем, что считаем подходящими для него этот список машин (по каждой показываем все известные нам характеристики).
+   - Если на Шаге 1 **не удалось определить 3 параметра** — отвечаем пользователю в чат в дружелюбной форме и задаём дополнительные вопросы.
+
+**Важно:** текст ответа пользователю должен **генерироваться отдельным запросом к LLM**, в который передаются все нужные данные для его генерации.
+
+### 9.4. Промпты и логирование
+
+- **Промпты** для запросов к LLM необходимо **вынести в константы** (отдельный модуль/файл).
+- Предусмотреть **логирование всех взаимодействий пользователя с бэкендом**: в БД сохраняются все этапы — сообщение пользователя, промпты и запросы к LLM, ответы от LLM, комментарии по логике принятия решений алгоритма (например: «не удалось определить параметры, поэтому задаём вопросы; вопросы генерируем с помощью LLM»).
+
+---
+
+**Документ готов к использованию кодинг-агентами.** Рекомендуемый порядок реализации: Backend B1–B9 (инфраструктура и авторизация), Frontend F1–F8 и F15–F16 (вход и роутинг), затем B10–B15 и F9–F14 (чат, DeepSeek API, поиск авто, UI чата и результатов).
+
+---
+
+## 10. Ревью архитектора-критика
+
+Ревью проведено по чеклисту субагента «Системный архитектор — критик».
+
+### Резюме
+
+- **Вердикт:** Готово к реализации с учётом рекомендаций.
+- **Оценка по категориям:** Executive Summary ✅, Архитектурная диаграмма ✅, Структура компонентов ✅, API/интерфейсы ✅, Модель данных ✅, План реализации ✅, Acceptance Criteria ✅.
+
+### Критические замечания (блокируют реализацию)
+
+Критических пробелов не выявлено. Контракты API, DDL, порядок задач и критерии приёмки заданы однозначно.
+
+### Рекомендации по улучшению (не блокируют)
+
+1. **Раздел 4 (API):** Явно указать для GET /api/v1/chat/sessions коды ошибок (401 при отсутствии токена).
+2. **Раздел 5.2:** Подтвердить явно, что при ON DELETE CASCADE для `sessions` каскадно удаляются `chat_messages` и `search_parameters` (зависит от настроек FK в миграции).
+3. **Раздел 6 (План):** ~~В задаче B10 зафиксировать имя модели Ollama~~ ✅ Решено: используется DeepSeek API (deepseek-chat), DEEPSEEK_API_KEY в .env.example.
+4. **Раздел 9.3 vs 4.2:** ~~Уточнить соответствие «2 параметра» в п. 9.3 и «≥3 параметров» в разделе 4.2~~ ✅ Решено: единый порог — не менее 3 параметров (MIN_PARAMS_FOR_SEARCH = 3) зафиксирован в разделе 9.3 и в коде.
+
+### Пропущенные аспекты
+
+- **Мониторинг и логирование:** Не описаны метрики (латентность API, ошибки DeepSeek), структура логов и их ротация.
+- **Rate limiting:** Не указан для auth и chat эндпоинтов (при публичном деплое желательно).
+- **CORS:** В разделе 3.2 упомянуто «разрешить origin фронтенда», но не заданы конкретные `origins` (например для dev/prod).
+
+### Альтернативные риски
+
+- **Версионирование API:** Префикс `/api/v1` зафиксирован; план миграции на v2 при изменении контрактов не описан (приемлемо для MVP).
+- **Импорт cars.xml:** В B15 указан URL Yandex; при недоступности URL нужен явный fallback на локальный файл и документирование формата полей XML.

@@ -67,6 +67,7 @@ describe("ChatLayout", () => {
         price_rub: 2_500_000,
         body_type: null,
         fuel_type: null,
+        modification: null,
         transmission: null,
         images: [],
       },
@@ -78,11 +79,10 @@ describe("ChatLayout", () => {
     expect(screen.getByText("Toyota Camry")).toBeInTheDocument();
   });
 
-  it("disables message input when no sessionId", () => {
+  it("disables message input when no sessionId (loading current dialog)", () => {
     render(<ChatLayout {...defaultProps} sessionId={null} />);
 
-    expect(screen.getByPlaceholderText("Напишите сообщение...")).toBeDisabled();
-    expect(screen.getByRole("button", { name: /отправить/i })).toBeDisabled();
+    expect(screen.getByPlaceholderText("Загрузка...")).toBeDisabled();
   });
 
   it("disables message input when sendLoading", () => {
