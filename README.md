@@ -106,6 +106,69 @@ npm run dev
 
 ---
 
+## Миграции на Render без Shell
+
+На бесплатном плане Render вкладка **Shell** может быть недоступна, а миграции при деплое иногда не срабатывают. Миграции можно выполнить **с вашего компьютера**, подключившись к базе на Render по внешнему URL.
+
+1. **Взять External Database URL на Render**
+   - [Dashboard](https://dashboard.render.com) → база **carmatch-db** → вкладка **Info**.
+   - Скопировать **External Database URL** (строка вида `postgres://user:password@host/dbname?sslmode=...`).
+
+2. **Запустить миграции локально** (из папки `carmatch-backend`):
+
+   **Windows (cmd):**
+   ```cmd
+   cd carmatch-backend
+   set DATABASE_URL=postgres://...вставьте_скопированный_URL...
+   python -m alembic upgrade head
+   ```
+
+   **Windows (PowerShell):**
+   ```powershell
+   cd carmatch-backend
+   $env:DATABASE_URL="postgres://...вставьте_скопированный_URL..."
+   python -m alembic upgrade head
+   ```
+
+   **Linux / macOS:**
+   ```bash
+   cd carmatch-backend
+   export DATABASE_URL="postgres://...вставьте_скопированный_URL..."
+   python -m alembic upgrade head
+   ```
+
+   Подставлять нужно **полный** URL от Render (с паролем). Префикс `postgres://` или `postgresql://` конфиг бэкенда автоматически приведёт к `postgresql+psycopg://` для драйвера.
+
+3. После успешного выполнения база на Render будет обновлена до последней версии схемы.
+
+---
+
+## Обновление базы на Render
+
+### Вариант 1: Полная копия локальной БД (без cars.xml)
+
+Переносит **все** данные с локальной БД на Render: пользователи, сессии, сообщения, справочники (марки, модели и т.д.) и объявления (`cars`). Файл `cars.xml` не нужен.
+
+**PowerShell** (из папки `carmatch-backend`):
+```powershell
+cd carmatch-backend
+$env:REMOTE_DATABASE_URL="postgresql://user:password@host/dbname?sslmode=require"
+python scripts/copy_full_db_to_render.py
+```
+
+Скрипт: применяет миграции на Render → очищает таблицы на Render → копирует все строки из локальной БД. Локальная БД по умолчанию: `localhost:5433/carmatch`. Иначе задайте `LOCAL_DATABASE_URL`.
+
+### Вариант 2: Миграции + cars.xml + копия только cars
+
+Если нужны только справочники из XML и объявления с локальной БД:
+```powershell
+$env:REMOTE_DATABASE_URL="postgresql://..."
+python scripts/update_render_db.py
+```
+(Требуется файл `cars.xml` в корне проекта.)
+
+---
+
 ## Стек
 
 - **Backend:** Python, FastAPI, PostgreSQL, Alembic, JWT
