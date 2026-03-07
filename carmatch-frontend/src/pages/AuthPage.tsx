@@ -24,14 +24,17 @@ export default function AuthPage() {
     setError(null);
 
     try {
+      let isAdmin = false;
       if (isLogin) {
         const res = await login(formData.email, formData.password);
         setLogin(res.access_token, res.user);
+        isAdmin = res.user.is_admin;
       } else {
         const res = await register(formData.email, formData.password);
         setRegister(res.access_token, res.user);
+        isAdmin = res.user.is_admin;
       }
-      navigate("/chat", { replace: true });
+      navigate(isAdmin ? "/admin/cars" : "/chat", { replace: true });
     } catch (err: unknown) {
       const ax = err as {
         response?: {
@@ -116,7 +119,7 @@ export default function AuthPage() {
               value={formData.password}
               onChange={handleChange}
               required
-              minLength={8}
+              minLength={4}
             />
           </div>
 

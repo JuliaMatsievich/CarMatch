@@ -45,6 +45,8 @@ export interface MessageListItem {
   content: string;
   sequence_order: number;
   created_at: string;
+  /** Карточки автомобилей, привязанные к этому сообщению (для ответов ассистента). */
+  search_results?: SendMessageCarResult[];
 }
 
 export interface ExtractedParam {
@@ -66,6 +68,7 @@ export interface SendMessageCarResult {
   horsepower?: number | null;
   modification: string | null;
   transmission: string | null;
+  country?: string | null;
   images: string[];
   description?: string | null;
 }

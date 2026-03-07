@@ -71,9 +71,13 @@ def copy_full_db():
     remote = Remote()
 
     try:
-        # Очистить все таблицы на Render: users, sessions, car_brands — CASCADE очистит остальные
+        # Очистить все таблицы на Render (явно перечислены, порядок по зависимостям: родители первыми, CASCADE очистит дочерние)
         print("Очистка таблиц на Render...")
-        remote.execute(text('TRUNCATE TABLE users, sessions, car_brands RESTART IDENTITY CASCADE;'))
+        remote.execute(text(
+            "TRUNCATE TABLE users, sessions, car_brands, car_models, car_generations, "
+            "car_modifications, car_complectations, cars, chat_messages, search_parameters "
+            "RESTART IDENTITY CASCADE;"
+        ))
         remote.commit()
         print("OK.\n")
 

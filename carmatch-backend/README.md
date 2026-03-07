@@ -10,7 +10,7 @@ docker compose up -d
 
 Поднимаются:
 
-- **postgres** — порт 5432, БД carmatch, пользователь/пароль carmatch
+- **postgres** — с хоста порт **5433** (в контейнере 5432), БД carmatch, пользователь/пароль carmatch
 - **api** — порт 8000, при старте выполняет миграции и запускает uvicorn
 
 API: http://localhost:8000  
@@ -24,7 +24,7 @@ API: http://localhost:8000
 1. **Перейдите в папку бэкенда:** `cd carmatch-backend` (uvicorn должен запускаться именно отсюда).
 2. PostgreSQL: `docker compose up -d postgres`
 3. Таблица: `docker exec carmatch-postgres psql -U carmatch -d carmatch -c "CREATE TABLE IF NOT EXISTS users (...);"` (см. полный DDL в разделе 5 спецификации)
-4. `.env`: `DATABASE_URL=postgresql+psycopg://carmatch:carmatch@localhost:5432/carmatch`
+4. `.env`: `DATABASE_URL=postgresql+psycopg://carmatch:carmatch@localhost:5433/carmatch` (БД на порту 5433)
 5. `pip install -r requirements.txt && python -m uvicorn main:app --reload --port 8000`
 
 При старте в консоли выводятся все маршруты; среди них должен быть `POST /api/v1/chat/complete`. Если его нет — вы запустили uvicorn не из папки `carmatch-backend`.

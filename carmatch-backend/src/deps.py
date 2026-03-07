@@ -35,3 +35,16 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Неверный или истёкший токен",
         )
+
+
+def get_current_admin(user: User = Depends(get_current_user)) -> User:
+    """
+    Возвращает текущего пользователя, если он администратор.
+    Используется только в админ-роутерах.
+    """
+    if not user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Требуется доступ администратора",
+        )
+    return user

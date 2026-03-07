@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     # GigaChat API (authorization key from https://developers.sber.ru/studio/)
     gigachat_credentials: str = ""
     gigachat_verify_ssl_certs: bool = True
+    # Эмбеддинги Яндекса (Yandex Cloud Foundation Models) — для векторного поиска по cars
+    yandex_folder_id: str = ""  # ID каталога в Yandex Cloud
+    yandex_api_key: str = ""   # API-ключ сервисного аккаунта (роль ai.languageModels.user)
     # LLM через GenAPI (https://gen-api.ru) — DeepSeek Reasoner (используется для сессий подбора авто)
     genapi_api_key: str = ""  # API-ключ из личного кабинета GenAPI
     genapi_generate_url: str = ""  # Полный URL "запроса на генерацию" из документации GenAPI

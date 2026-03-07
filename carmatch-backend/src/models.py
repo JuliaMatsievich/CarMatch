@@ -14,6 +14,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import UUID
+from pgvector.sqlalchemy import Vector
 
 from src.database import Base, ArrayTextCompat, JSONBCompat
 
@@ -178,9 +179,12 @@ class Car(Base):
     horsepower = Column(Integer, nullable=True)
     modification = Column(String(100), nullable=True)  # полная строка модификации (например "1.6d MT 90 л.с.")
     transmission = Column(String(20), nullable=True)  # тип коробки: MT, AMT, CVT и т.д.
+    country = Column(String(80), nullable=True)  # страна-производитель (например "Франция")
     specs = Column(JSONBCompat, default=dict, nullable=False)
     images = Column(ArrayTextCompat, nullable=True)
     description = Column(Text, nullable=True)
+    # Эмбеддинг для векторного поиска (модель Яндекса, размерность 256)
+    embedding = Column(Vector(256), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     imported_at = Column(DateTime, default=utcnow, nullable=False)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)

@@ -1,5 +1,6 @@
 """Роутер чат-сессий: создание сессии, отправка и получение сообщений."""
 
+import re
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -17,6 +18,43 @@ from src.schemas import (
     ExtractedParam,
     CarResult,
 )
+
+
+def _extract_country_from_description(description: str | None) -> str | None:
+    """Из текста описания извлекает страну («Выпускается в X», «Производство — X»)."""
+    if not description or not description.strip():
+        return None
+    d = description.strip()
+    m = re.search(r"\bВыпускается\s+в\s+([^.]+?)(?:\.|$)", d, re.IGNORECASE)
+    if m:
+        return m.group(1).strip() or None
+    m = re.search(r"Производство\s*[—\-]\s*([^.]+?)(?:\.|$)", d)
+    if m:
+        return m.group(1).strip() or None
+    return None
+
+
+def _message_search_results(extra_metadata):
+    """Достаёт и валидирует search_results из extra_metadata сообщения."""
+    if not extra_metadata or not isinstance(extra_metadata, dict):
+        return []
+    raw = extra_metadata.get("search_results")
+    if not isinstance(raw, list):
+        return []
+    result = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        item = dict(item)
+        if not item.get("country") and item.get("description"):
+            extracted = _extract_country_from_description(item["description"])
+            if extracted:
+                item["country"] = extracted
+        try:
+            result.append(CarResult.model_validate(item))
+        except Exception:
+            continue
+    return result
 from src.database import get_db
 from src.services.chat import add_message, create_session
 
@@ -25,6 +63,10 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 
 def _car_to_result(car) -> CarResult:
     """Преобразует ORM Car в схему CarResult для ответа (все поля из БД)."""
+    country = getattr(car, "country", None) or None
+    description = getattr(car, "description", None)
+    if not country and description:
+        country = _extract_country_from_description(description)
     return CarResult(
         id=car.id,
         mark_name=car.mark_name,
@@ -37,6 +79,7 @@ def _car_to_result(car) -> CarResult:
         horsepower=car.horsepower,
         modification=getattr(car, "modification", None) or None,
         transmission=car.transmission,
+        country=country,
         images=list(car.images) if car.images else [],
         description=getattr(car, "description", None) or None,
         brand_id=car.brand_id,
@@ -236,6 +279,7 @@ def get_messages(
                 content=m.content,
                 sequence_order=m.sequence_order,
                 created_at=m.created_at,
+                search_results=_message_search_results(getattr(m, "extra_metadata", None)),
             )
             for m in messages
         ]

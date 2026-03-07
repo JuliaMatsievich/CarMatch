@@ -1,0 +1,282 @@
+.layoutGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr) minmax(260px, 1.3fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.cardHeader {
+  margin-bottom: 8px;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.sessionsWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.table thead {
+  background: #f1f5f9;
+}
+
+.table th,
+.table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+}
+
+.sessionActions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.iconBtn {
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid #fee2e2;
+  background: #fef2f2;
+  color: #b91c1c;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.iconBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.rowSelected {
+  background: #eff6ff;
+}
+
+.rowSelected td {
+  font-weight: 500;
+}
+
+.clickableRow {
+  cursor: pointer;
+}
+
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 6px;
+  font-size: 0.8rem;
+}
+
+.pageControls {
+  display: flex;
+  gap: 4px;
+}
+
+.pageBtn {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.pageBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.chatList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 520px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chatItem {
+  display: flex;
+}
+
+.bubbleButton {
+  border: none;
+  padding: 0;
+  background: transparent;
+  width: 100%;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+.bubbleUser {
+  margin-left: auto;
+  background: #1d4ed8;
+  color: #ffffff;
+  max-width: 80%;
+  border-radius: 12px;
+  border-bottom-right-radius: 4px;
+  padding: 8px 10px;
+  font-size: 0.85rem;
+}
+
+.bubbleAssistant {
+  margin-right: auto;
+  background: #e5e7eb;
+  color: #111827;
+  max-width: 80%;
+  border-radius: 12px;
+  border-bottom-left-radius: 4px;
+  padding: 8px 10px;
+  font-size: 0.85rem;
+}
+
+.bubbleMeta {
+  font-size: 0.7rem;
+  opacity: 0.8;
+  margin-bottom: 2px;
+}
+
+.logsBody {
+  flex: 1;
+  min-height: 0;
+  border-radius: 8px;
+  background: #f9fafb;
+  padding: 8px;
+  font-size: 0.8rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.logsPre {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 100%;
+  overflow: auto;
+}
+
+.logsPlaceholder {
+  color: #6b7280;
+  font-size: 0.8rem;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border-radius: 999px;
+  border: 1px solid #bfdbfe;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease,
+    transform 0.05s ease;
+}
+
+.backLink:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.backLink:active {
+  transform: translateY(1px);
+}
+
+.selectedCheck {
+  margin-left: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #1d4ed8;
+  align-self: center;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+}
+
+.modal {
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35);
+  padding: 18px 20px 16px;
+  max-width: 420px;
+  width: 100%;
+}
+
+.modalTitle {
+  margin: 0 0 6px 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.modalText {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #4b5563;
+  line-height: 1.5;
+}
+
+.modalActions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.modalBtn {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.modalBtnDanger {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #fecaca;
+  background: #fee2e2;
+  color: #b91c1c;
+  font-size: 0.8rem;
+  cursor: pointer;
+}

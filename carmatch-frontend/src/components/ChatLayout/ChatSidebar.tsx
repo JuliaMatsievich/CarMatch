@@ -20,6 +20,7 @@ interface ChatSidebarProps {
   onSelectSession: (id: string) => void;
   onDeleteSession?: (id: string) => void;
   onLogout: () => void;
+  userEmail?: string | null;
 }
 
 export function ChatSidebar({
@@ -31,6 +32,7 @@ export function ChatSidebar({
   onSelectSession,
   onDeleteSession,
   onLogout,
+  userEmail,
 }: ChatSidebarProps) {
   return (
     <aside
@@ -135,6 +137,11 @@ export function ChatSidebar({
         ))}
       </ul>
       <div className={styles.sidebarFooter}>
+        {!collapsed && userEmail && (
+          <div className={styles.userInfo} title={userEmail}>
+            {userEmail}
+          </div>
+        )}
         <button
           type="button"
           className={styles.logoutBtn}

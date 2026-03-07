@@ -25,6 +25,7 @@ def _car_to_result(c):
         horsepower=c.horsepower,
         modification=getattr(c, "modification", None) or None,
         transmission=c.transmission,
+        country=getattr(c, "country", None) or None,
         images=list(c.images) if c.images else [],
         description=getattr(c, "description", None) or None,
         brand_id=c.brand_id,

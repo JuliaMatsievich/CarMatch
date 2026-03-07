@@ -5,18 +5,27 @@ from pydantic import BaseModel, EmailStr, Field
 
 class RegisterRequest(BaseModel):
     email: EmailStr
-    password: str = Field(..., min_length=8, description="Пароль должен содержать минимум 8 символов")
+    password: str = Field(
+        ...,
+        min_length=4,
+        description="Пароль должен содержать минимум 4 символа",
+    )
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: str = Field(..., min_length=8, description="Пароль должен содержать минимум 8 символов")
+    password: str = Field(
+        ...,
+        min_length=4,
+        description="Пароль должен содержать минимум 4 символа",
+    )
 
 
 class UserResponse(BaseModel):
     id: int
     email: str
     is_active: bool
+    is_admin: bool
     created_at: datetime
 
     class Config:
@@ -90,6 +99,8 @@ class MessageListItem(BaseModel):
     content: str
     sequence_order: int
     created_at: datetime
+    """Карточки автомобилей, привязанные к этому сообщению (для ответов ассистента)."""
+    search_results: list["CarResult"] = []
 
     class Config:
         from_attributes = True
@@ -225,6 +236,7 @@ class CarResult(BaseModel):
     horsepower: int | None = None
     modification: str | None = None  # полная строка модификации
     transmission: str | None = None  # тип коробки (MT, AMT, CVT и т.д.)
+    country: str | None = None  # страна-производитель
     images: list[str] = []
     description: str | None = None
     brand_id: int | None = None
@@ -241,5 +253,123 @@ class CarSearchResponse(BaseModel):
     results: list[CarResult]
 
 
-# Разрешить forward reference в MessageResponse.search_results
+# --- Админ-схемы ---
+
+
+class AdminCarBase(BaseModel):
+    mark_name: str
+    model_name: str
+    body_type: str | None = None
+    year: int | None = None
+    price_rub: float | None = None
+    fuel_type: str | None = None
+    engine_volume: float | None = None
+    horsepower: int | None = None
+    modification: str | None = None
+    transmission: str | None = None
+    country: str | None = None
+    description: str | None = None
+    images: list[str] | None = None
+    is_active: bool = True
+
+
+class AdminCarCreate(AdminCarBase):
+    pass
+
+
+class AdminCarUpdate(BaseModel):
+    mark_name: str | None = None
+    model_name: str | None = None
+    body_type: str | None = None
+    year: int | None = None
+    price_rub: float | None = None
+    fuel_type: str | None = None
+    engine_volume: float | None = None
+    horsepower: int | None = None
+    modification: str | None = None
+    transmission: str | None = None
+    country: str | None = None
+    description: str | None = None
+    images: list[str] | None = None
+    is_active: bool | None = None
+
+
+class AdminCarItem(CarResult):
+    is_active: bool
+
+
+class AdminCarListResponse(BaseModel):
+    items: list[AdminCarItem]
+    total: int
+    page: int
+    per_page: int
+    pages: int
+
+
+class AdminSessionListItem(BaseModel):
+    id: UUID
+    user_id: int
+    user_email: str
+    created_at: datetime
+    message_count: int
+    display_status: str
+    extracted_params_summary: str
+    cars_found: int
+
+
+class AdminSessionMessage(BaseModel):
+    id: int
+    role: str
+    content: str
+    sequence_order: int
+    created_at: datetime
+    ai_metadata: dict | None = None
+
+
+class AdminSessionDetail(BaseModel):
+    id: UUID
+    user_id: int
+    user_email: str
+    status: str
+    display_status: str
+    extracted_params: dict
+    search_results: list[CarResult]
+    created_at: datetime
+    message_count: int
+    cars_found: int
+
+
+class AdminSessionDetailResponse(BaseModel):
+    session: AdminSessionDetail
+    messages: list[AdminSessionMessage]
+
+
+class AdminSessionListResponse(BaseModel):
+    items: list[AdminSessionListItem]
+    total: int
+    page: int
+    per_page: int
+    pages: int
+
+
+class AdminUserListItem(BaseModel):
+    id: int
+    email: str
+    is_active: bool
+    created_at: datetime
+    last_login: datetime | None = None
+    login_count: int
+    sessions_count: int
+
+
+class AdminUserListResponse(BaseModel):
+    items: list[AdminUserListItem]
+    total: int
+    page: int
+    per_page: int
+    pages: int
+
+
+# Разрешить forward reference в MessageResponse и MessageListItem.search_results
 MessageResponse.model_rebuild()
+MessageListItem.model_rebuild()

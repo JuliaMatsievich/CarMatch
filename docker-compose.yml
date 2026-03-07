@@ -1,7 +1,6 @@
 services:
   postgres:
-    image: postgres:15-alpine
-    container_name: carmatch-postgres
+    image: pgvector/pgvector:pg15
     environment:
       POSTGRES_USER: carmatch
       POSTGRES_PASSWORD: carmatch
@@ -20,7 +19,6 @@ services:
     build:
       context: ./carmatch-backend
       dockerfile: ./Dockerfile
-    container_name: carmatch-api
     ports:
       - "8000:8000"
     environment:
