@@ -48,7 +48,13 @@ describe("AdminAuthContext", () => {
   });
 
   it("throws when useAdminAuth is used outside AdminAuthProvider", () => {
-    expect(() => render(<TestConsumer />)).toThrow(
+    let thrown: Error | null = null;
+    try {
+      render(<TestConsumer />);
+    } catch (e) {
+      thrown = e instanceof Error ? e : new Error(String(e));
+    }
+    expect(thrown?.message).toBe(
       "useAdminAuth must be used within AdminAuthProvider"
     );
   });

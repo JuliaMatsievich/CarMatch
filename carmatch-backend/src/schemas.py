@@ -7,8 +7,8 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(
         ...,
-        min_length=4,
-        description="Пароль должен содержать минимум 4 символа",
+        min_length=8,
+        description="Пароль должен содержать минимум 8 символов",
     )
 
 
@@ -16,8 +16,8 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(
         ...,
-        min_length=4,
-        description="Пароль должен содержать минимум 4 символа",
+        min_length=8,
+        description="Пароль должен содержать минимум 8 символов",
     )
 
 
