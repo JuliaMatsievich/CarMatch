@@ -81,6 +81,8 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Hook export is intentional; react-refresh expects only components in this file.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAdminAuth(): AdminAuthContextValue {
   const ctx = useContext(AdminAuthContext);
   if (!ctx) {

@@ -197,7 +197,6 @@ function AdminCarsInner() {
   };
 
   const handleDelete = (car: AdminCarItem) => {
-    // eslint-disable-next-line no-alert
     const ok = window.confirm(
       `Удалить автомобиль #${car.id} ${car.mark_name} ${car.model_name}?`
     );

@@ -47,7 +47,7 @@ export interface AdminCarCreate {
   is_active?: boolean;
 }
 
-export interface AdminCarUpdate extends Partial<AdminCarCreate> {}
+export type AdminCarUpdate = Partial<AdminCarCreate>;
 
 export interface AdminCarListParams {
   page?: number;

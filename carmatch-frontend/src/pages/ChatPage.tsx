@@ -202,7 +202,6 @@ export function ChatPage() {
       } catch (err: unknown) {
         // Ошибку запроса больше не добавляем в чат как отдельное сообщение ассистента,
         // чтобы не было «второго ответа». Логируем только в консоль.
-        // eslint-disable-next-line no-console
         console.error("sendMessage failed", err);
       } finally {
         setSendLoading(false);

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, useNavigate } from "react-router-dom";
+import { MemoryRouter } from "react-router-dom";
 import { AdminLayout } from "./AdminLayout";
 import { AuthProvider } from "../../../contexts/AuthContext";
 
@@ -95,17 +95,9 @@ describe("AdminLayout", () => {
   });
 
   it("logout navigates to /login", async () => {
-    let navigateFn: (path: string) => void;
-    function CaptureNavigate() {
-      const navigate = useNavigate();
-      navigateFn = navigate;
-      return null;
-    }
-
     render(
       <MemoryRouter>
         <AuthProvider>
-          <CaptureNavigate />
           <AdminLayout title="Страница">
             <div>Body</div>
           </AdminLayout>
