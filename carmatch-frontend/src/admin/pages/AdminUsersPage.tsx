@@ -1,9 +1,18 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  keepPreviousData,
+} from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
 import { AdminLayout } from "../components/AdminLayout/AdminLayout";
-import { adminDeleteUser, adminListUsers } from "../api/adminUsers";
+import {
+  adminDeleteUser,
+  adminListUsers,
+  type AdminUserListResponse,
+} from "../api/adminUsers";
 import styles from "./AdminUsersPage.module.css";
 
 function AdminUsersInner() {
@@ -16,7 +25,7 @@ function AdminUsersInner() {
   const [confirmUserId, setConfirmUserId] = useState<number | null>(null);
   const [confirmUserEmail, setConfirmUserEmail] = useState<string | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<AdminUserListResponse>({
     queryKey: ["admin-users", page, perPage, emailFilter, activeFilter],
     queryFn: () =>
       adminListUsers({
@@ -27,10 +36,10 @@ function AdminUsersInner() {
           activeFilter === ""
             ? undefined
             : activeFilter === "active"
-            ? true
-            : false,
+              ? true
+              : false,
       }),
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
 
   const deleteMutation = useMutation({
@@ -125,7 +134,7 @@ function AdminUsersInner() {
                         className={styles.iconBtn}
                         title="Удалить пользователя"
                         onClick={() => handleDelete(u.id, u.email)}
-                        disabled={deleteMutation.isLoading}
+                        disabled={deleteMutation.isPending}
                       >
                         <Trash2 size={14} />
                       </button>
@@ -188,7 +197,7 @@ function AdminUsersInner() {
                   setConfirmUserId(null);
                   setConfirmUserEmail(null);
                 }}
-                disabled={deleteMutation.isLoading}
+                disabled={deleteMutation.isPending}
               >
                 Отменить
               </button>
@@ -196,7 +205,7 @@ function AdminUsersInner() {
                 type="button"
                 className={styles.modalBtnDanger}
                 onClick={() => deleteMutation.mutate(confirmUserId)}
-                disabled={deleteMutation.isLoading}
+                disabled={deleteMutation.isPending}
               >
                 Удалить
               </button>

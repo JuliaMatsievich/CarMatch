@@ -1,5 +1,10 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  keepPreviousData,
+} from "@tanstack/react-query";
 import { X, Pencil, Trash2, ChevronUp, ChevronDown } from "lucide-react";
 import { AdminLayout } from "../components/AdminLayout/AdminLayout";
 import {
@@ -10,6 +15,7 @@ import {
   type AdminCarItem,
   type AdminCarCreate,
   type AdminCarUpdate,
+  type AdminCarListResponse,
 } from "../api/adminCars";
 import styles from "./AdminCarsPage.module.css";
 
@@ -83,7 +89,7 @@ function AdminCarsInner() {
   const [editingCar, setEditingCar] = useState<AdminCarItem | null>(null);
   const [form, setForm] = useState<CarFormState>(emptyForm);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<AdminCarListResponse>({
     queryKey: [
       "admin-cars",
       page,
@@ -110,7 +116,7 @@ function AdminCarsInner() {
         sort_by: sortBy || undefined,
         sort_dir: sortBy ? sortDir : undefined,
       }),
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
 
   const createMutation = useMutation({
@@ -168,10 +174,15 @@ function AdminCarsInner() {
   const handleFormChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
-    const { name, value, type, checked } = e.target;
+    const t = e.target;
+    const name = t.name;
+    const value =
+      t instanceof HTMLInputElement && t.type === "checkbox"
+        ? t.checked
+        : t.value;
     setForm((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : value,
+      [name]: value,
     }));
   };
 
@@ -181,7 +192,7 @@ function AdminCarsInner() {
     if (editingCar) {
       updateMutation.mutate({ id: editingCar.id, body: payload });
     } else {
-      createMutation.mutate(payload);
+      createMutation.mutate(payload as AdminCarCreate);
     }
   };
 

@@ -1,8 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { AdminLayout } from "../components/AdminLayout/AdminLayout";
-import { adminListUsers, type AdminUserListItem } from "../api/adminUsers";
+import {
+  adminListUsers,
+  type AdminUserListItem,
+  type AdminUserListResponse,
+} from "../api/adminUsers";
 import styles from "./AdminDialogsPage.module.css";
 
 function AdminDialogsInner() {
@@ -11,7 +15,7 @@ function AdminDialogsInner() {
   const [perPage] = useState(20);
   const [emailFilter, setEmailFilter] = useState<string>("");
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<AdminUserListResponse>({
     queryKey: ["admin-dialog-users", page, perPage, emailFilter],
     queryFn: () =>
       adminListUsers({
@@ -19,7 +23,7 @@ function AdminDialogsInner() {
         per_page: perPage,
         email: emailFilter || undefined,
       }),
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
 
   const handleOpen = (user: AdminUserListItem) => {

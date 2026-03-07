@@ -199,7 +199,6 @@ export function ChatPage() {
         }
         setMessages((prev) => [...prev, assistantMsg]);
         getSessions().then((r) => setSessions(r.sessions));
-        setCars([]);
       } catch (err: unknown) {
         // Ошибку запроса больше не добавляем в чат как отдельное сообщение ассистента,
         // чтобы не было «второго ответа». Логируем только в консоль.

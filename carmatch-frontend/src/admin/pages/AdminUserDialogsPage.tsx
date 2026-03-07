@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Car, Trash2, User } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  keepPreviousData,
+} from "@tanstack/react-query";
 import { AdminLayout } from "../components/AdminLayout/AdminLayout";
 import { adminListUserSessions } from "../api/adminUsers";
 import {
@@ -9,6 +14,7 @@ import {
   adminDeleteSession,
   type AdminSessionDetailResponse,
   type AdminSessionMessage,
+  type AdminSessionListResponse,
 } from "../api/adminSessions";
 import styles from "./AdminUserDialogsPage.module.css";
 import chatStyles from "../../components/Chat/MessageList.module.css";
@@ -32,11 +38,11 @@ function AdminUserDialogsInner() {
   const {
     data: sessionsData,
     isLoading: isSessionsLoading,
-  } = useQuery({
+  } = useQuery<AdminSessionListResponse>({
     queryKey: ["admin-user-sessions", numericUserId, page, perPage],
     queryFn: () => adminListUserSessions(numericUserId, page, perPage),
     enabled: Number.isFinite(numericUserId),
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
 
   const totalPages = sessionsData?.pages ?? 0;
@@ -177,7 +183,7 @@ function AdminUserDialogsInner() {
                             className={styles.iconBtn}
                             title="Удалить сессию"
                             onClick={() => openDeleteConfirm(s.id)}
-                            disabled={deleteMutation.isLoading}
+                            disabled={deleteMutation.isPending}
                           >
                             <Trash2 size={16} />
                           </button>
@@ -334,7 +340,7 @@ function AdminUserDialogsInner() {
                 type="button"
                 className={styles.modalBtn}
                 onClick={() => setConfirmSessionId(null)}
-                disabled={deleteMutation.isLoading}
+                disabled={deleteMutation.isPending}
               >
                 Отменить
               </button>
@@ -342,7 +348,7 @@ function AdminUserDialogsInner() {
                 type="button"
                 className={styles.modalBtnDanger}
                 onClick={() => deleteMutation.mutate(confirmSessionId)}
-                disabled={deleteMutation.isLoading}
+                disabled={deleteMutation.isPending}
               >
                 Удалить диалог
               </button>
