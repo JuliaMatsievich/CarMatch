@@ -17,7 +17,6 @@ import type {
   SendMessageResponse,
   ExtractedParam,
 } from "../api/chat";
-import type { CarResult } from "../api/cars";
 import type { CarSearchParams } from "../api/cars";
 
 const MIN_PARAMS_FOR_SEARCH = 3;
@@ -74,10 +73,9 @@ function extractedParamsToSearchParams(
 export function ChatPage() {
   const navigate = useNavigate();
   const { sessionId } = useParams<{ sessionId: string }>();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const [sessions, setSessions] = useState<ChatSessionListItem[]>([]);
   const [messages, setMessages] = useState<MessageListItem[]>([]);
-  const [cars, setCars] = useState<CarResult[]>([]);
   const [sendLoading, setSendLoading] = useState(false);
 
   // На /chat без sessionId — получаем «текущий новый диалог» (пустая сессия или создаём одну) и переходим в неё
@@ -103,28 +101,33 @@ export function ChatPage() {
       .catch(() => {});
   }, [sessionId]);
 
-  // Загрузка сообщений при выборе сессии
+  // Загрузка сообщений при выборе сессии (карточки приходят в search_results у каждого сообщения)
   useEffect(() => {
     if (!sessionId) {
       setMessages([]);
-      setCars([]);
       return;
     }
     getMessages(sessionId)
-      .then((res) => {
-        setMessages(res.messages);
-        setCars([]);
-      })
+      .then((res) => setMessages(res.messages))
       .catch(() => setMessages([]));
   }, [sessionId]);
 
   const handleNewChat = useCallback(() => {
+    // Если уже открыт новый пустой диалог, не создаём ещё один
+    if (sessionId) {
+      const currentSession = sessions.find((s) => s.id === sessionId);
+      const isCurrentEmpty =
+        currentSession && currentSession.message_count === 0 && messages.length === 0;
+      if (isCurrentEmpty) {
+        return;
+      }
+    }
+
     createSession().then((session) => {
       navigate(`/chat/${session.id}`, { replace: true });
       setMessages([]);
-      setCars([]);
     });
-  }, [navigate]);
+  }, [navigate, sessionId, sessions, messages.length]);
 
   const handleSelectSession = useCallback(
     (id: string) => {
@@ -166,63 +169,40 @@ export function ChatPage() {
       try {
         const res: SendMessageResponse = await sendMessage(sessionId, content);
         const hasCars = res.search_results && res.search_results.length > 0;
-        // Когда уже подобранные автомобили — не показываем сообщение LLM, только карточки
-        if (!hasCars) {
-          const assistantMsg: MessageListItem = {
-            id: res.id,
-            session_id: res.session_id,
-            role: res.role,
-            content: res.content,
-            sequence_order: res.sequence_order,
-            created_at: res.created_at,
-          };
-          setMessages((prev) => [...prev, assistantMsg]);
-        }
-        getSessions().then((res) => setSessions(res.sessions));
-        if (hasCars) {
-          setCars(res.search_results ?? []);
-        } else if (
+        // Всегда добавляем ответ ассистента (текст + карточки привязаны к сообщению)
+        const assistantMsg: MessageListItem = {
+          id: res.id,
+          session_id: res.session_id,
+          role: res.role,
+          content: res.content,
+          sequence_order: res.sequence_order,
+          created_at: res.created_at,
+          search_results: hasCars ? res.search_results : undefined,
+        };
+        // Дополнительный SQL‑поиск только украшает ответ, ошибка здесь не должна ломать основное сообщение
+        if (
+          !hasCars &&
           res.ready_for_search &&
           res.extracted_params &&
           res.extracted_params.length >= MIN_PARAMS_FOR_SEARCH
         ) {
-          const searchParams = extractedParamsToSearchParams(
-            res.extracted_params
-          );
-          const carRes = await searchCarsApi(searchParams);
-          setCars(carRes.results);
-        } else {
-          setCars([]);
+          try {
+            const searchParams = extractedParamsToSearchParams(res.extracted_params);
+            const carRes = await searchCarsApi(searchParams);
+            if (carRes.results.length > 0) {
+              assistantMsg.search_results = carRes.results;
+            }
+          } catch {
+            // Игнорируем ошибку дополнительного поиска: лучше показать хотя бы текст ответа,
+            // чем пугать пользователя сообщением об ошибке.
+          }
         }
+        setMessages((prev) => [...prev, assistantMsg]);
+        getSessions().then((r) => setSessions(r.sessions));
       } catch (err: unknown) {
-        let errorText: string | null = null;
-        if (err && typeof err === "object" && "response" in err) {
-          const detail = (
-            err as { response?: { data?: { detail?: string | string[] } } }
-          ).response?.data?.detail;
-          if (typeof detail === "string") errorText = detail;
-          else if (Array.isArray(detail)) errorText = detail.join(". ");
-        }
-        const isTimeout =
-          err &&
-          typeof err === "object" &&
-          "code" in err &&
-          (err as { code?: string }).code === "ECONNABORTED";
-        const fallback = isTimeout
-          ? "Ответ занял слишком много времени. Попробуйте короче сообщение или позже."
-          : "Не удалось получить ответ. Проверьте подключение и авторизацию или попробуйте позже.";
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: 0,
-            session_id: sessionId,
-            role: "assistant",
-            content: errorText ?? fallback,
-            sequence_order: prev.length + 2,
-            created_at: new Date().toISOString(),
-          },
-        ]);
-        setCars([]);
+        // Ошибку запроса больше не добавляем в чат как отдельное сообщение ассистента,
+        // чтобы не было «второго ответа». Логируем только в консоль.
+        console.error("sendMessage failed", err);
       } finally {
         setSendLoading(false);
       }
@@ -240,13 +220,13 @@ export function ChatPage() {
       sessionId={sessionId ?? null}
       sessions={sessions}
       messages={messages}
-      cars={cars}
       onNewChat={handleNewChat}
       onSelectSession={handleSelectSession}
       onDeleteSession={handleDeleteSession}
       onSend={handleSend}
       onLogout={handleLogout}
       sendLoading={sendLoading}
+      userEmail={user?.email ?? null}
     />
   );
 }

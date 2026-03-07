@@ -2,19 +2,18 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { ChatLayout } from "./ChatLayout";
 import type { ChatSessionListItem, MessageListItem } from "../../api/chat";
-import type { CarResult } from "../../api/cars";
 
 describe("ChatLayout", () => {
   const defaultProps = {
     sessionId: "s1" as string | null,
     sessions: [] as ChatSessionListItem[],
     messages: [] as MessageListItem[],
-    cars: [] as CarResult[],
     onNewChat: vi.fn(),
     onSelectSession: vi.fn(),
     onSend: vi.fn(),
     onLogout: vi.fn(),
     sendLoading: false,
+    userEmail: "user@test.com",
   };
 
   it("renders sidebar with new chat and logout", () => {
@@ -57,28 +56,6 @@ describe("ChatLayout", () => {
     expect(screen.getByText("Привет")).toBeInTheDocument();
   });
 
-  it("renders car results when cars provided", () => {
-    const cars: CarResult[] = [
-      {
-        id: 1,
-        mark_name: "Toyota",
-        model_name: "Camry",
-        year: 2020,
-        price_rub: 2_500_000,
-        body_type: null,
-        fuel_type: null,
-        modification: null,
-        transmission: null,
-        images: [],
-      },
-    ];
-
-    render(<ChatLayout {...defaultProps} cars={cars} />);
-
-    expect(screen.getByText("Подобранные автомобили")).toBeInTheDocument();
-    expect(screen.getByText("Toyota Camry")).toBeInTheDocument();
-  });
-
   it("disables message input when no sessionId (loading current dialog)", () => {
     render(<ChatLayout {...defaultProps} sessionId={null} />);
 
@@ -89,5 +66,11 @@ describe("ChatLayout", () => {
     render(<ChatLayout {...defaultProps} sendLoading />);
 
     expect(screen.getByPlaceholderText("Напишите сообщение...")).toBeDisabled();
+  });
+
+  it("shows typing indicator when sendLoading is true", () => {
+    render(<ChatLayout {...defaultProps} sendLoading />);
+
+    expect(screen.getByRole("status")).toBeInTheDocument();
   });
 });

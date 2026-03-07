@@ -235,6 +235,17 @@
   border-top: 1px solid #e5e7eb;
 }
 
+.userInfo {
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+  color: #4b5563;
+  word-break: break-all;
+}
+
+.sidebarCollapsed .userInfo {
+  display: none;
+}
+
 .logoutBtn {
   width: 100%;
   padding: 10px;

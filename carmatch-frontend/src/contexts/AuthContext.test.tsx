@@ -48,9 +48,13 @@ describe("AuthContext", () => {
   });
 
   it("throws when useAuth used outside AuthProvider", () => {
-    expect(() => render(<TestConsumer />)).toThrow(
-      "useAuth must be used within AuthProvider"
-    );
+    let thrown: Error | null = null;
+    try {
+      render(<TestConsumer />);
+    } catch (e) {
+      thrown = e instanceof Error ? e : new Error(String(e));
+    }
+    expect(thrown?.message).toBe("useAuth must be used within AuthProvider");
   });
 
   it("provides initial state from localStorage", async () => {

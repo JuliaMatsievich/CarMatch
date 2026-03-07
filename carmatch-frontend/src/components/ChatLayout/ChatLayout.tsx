@@ -1,11 +1,10 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { ChatSidebar } from "./ChatSidebar";
 import { MessageList } from "../Chat/MessageList";
 import { MessageInput } from "../Chat/MessageInput";
 import type { ChatSessionListItem, MessageListItem } from "../../api/chat";
-import type { CarResult } from "../../api/cars";
-import { CarResults } from "../CarResults/CarResults";
 import styles from "./ChatLayout.module.css";
+import { SEARCH_HINT_MESSAGES } from "../../constants/searchMessages";
 
 const SIDEBAR_COLLAPSED_KEY = "carmatch_sidebar_collapsed";
 
@@ -13,27 +12,32 @@ interface ChatLayoutProps {
   sessionId: string | null;
   sessions: ChatSessionListItem[];
   messages: MessageListItem[];
-  cars: CarResult[];
   onNewChat: () => void;
   onSelectSession: (id: string) => void;
   onDeleteSession?: (id: string) => void;
   onSend: (content: string) => void;
   onLogout: () => void;
   sendLoading?: boolean;
+  userEmail?: string | null;
 }
 
 export function ChatLayout({
   sessionId,
   sessions,
   messages,
-  cars,
   onNewChat,
   onSelectSession,
   onDeleteSession,
   onSend,
   onLogout,
   sendLoading,
+  userEmail,
 }: ChatLayoutProps) {
+  const [hintMessage, setHintMessage] = useState<string | null>(null);
+  const hintsRef = useRef<string[]>([]);
+  const hintIndexRef = useRef(0);
+  const intervalRef = useRef<number | null>(null);
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
       return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
@@ -54,6 +58,39 @@ export function ChatLayout({
     setSidebarCollapsed((c) => !c);
   }, []);
 
+  useEffect(() => {
+    if (sendLoading) {
+      // Подготовить случайный порядок сообщений при каждом запуске поиска
+      const shuffled = SEARCH_HINT_MESSAGES.slice().sort(() => Math.random() - 0.5);
+      hintsRef.current = shuffled;
+      hintIndexRef.current = 0;
+      setHintMessage(shuffled[0] ?? null);
+
+      if (intervalRef.current !== null) {
+        window.clearInterval(intervalRef.current);
+      }
+      intervalRef.current = window.setInterval(() => {
+        const hints = hintsRef.current;
+        if (!hints.length) return;
+        hintIndexRef.current = (hintIndexRef.current + 1) % hints.length;
+        setHintMessage(hints[hintIndexRef.current] ?? null);
+      }, 3000);
+    } else {
+      if (intervalRef.current !== null) {
+        window.clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      setHintMessage(null);
+    }
+
+    return () => {
+      if (intervalRef.current !== null) {
+        window.clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [sendLoading]);
+
   return (
     <div className={styles.layout}>
       <ChatSidebar
@@ -65,23 +102,19 @@ export function ChatLayout({
         onSelectSession={onSelectSession}
         onDeleteSession={onDeleteSession}
         onLogout={onLogout}
+        userEmail={userEmail ?? null}
       />
       <main className={styles.main}>
         <div className={styles.messagesArea}>
           <MessageList messages={messages} />
-          {cars.length > 0 && (
-            <div className={styles.carResultsWrap}>
-              <CarResults cars={cars} />
-            </div>
-          )}
         </div>
-        {sendLoading && (
+        {sendLoading && hintMessage && (
           <div
             className={styles.typingIndicator}
             role="status"
             aria-live="polite"
           >
-            CatMatch подбирает машину....
+            {hintMessage}
           </div>
         )}
         <MessageInput

@@ -15,7 +15,7 @@ services:
       - ./cars.xml:/app/cars.xml:ro
 
   postgres:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     container_name: carmatch-postgres
     environment:
       POSTGRES_USER: carmatch

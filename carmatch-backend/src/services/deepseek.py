@@ -6,6 +6,7 @@ import json
 import logging
 import re
 from typing import Any, Dict, List
+from datetime import datetime
 
 from gigachat import GigaChat
 from gigachat.models import Chat, Messages, MessagesRole
@@ -13,17 +14,29 @@ from gigachat.models import Chat, Messages, MessagesRole
 logger = logging.getLogger(__name__)
 
 from src.config import settings
+from src.services import yandex_llm as yandex_llm_service
 
 MIN_PARAMS_FOR_SEARCH = 3
 EXTRACTED_PARAM_TYPES = {
-    "brand", "model", "body_type", "year",
-    "modification", "transmission", "fuel_type", "engine_volume", "horsepower",
+   "brand",
+   "model",
+   "body_type",
+   "year",
+   "modification",
+   "transmission",
+   "fuel_type",
+   "engine_volume",
+   "horsepower",
 }
 
 # --- Промпты (константы по разделу 9.4) ---
 
 ASSISTANT_STYLE_INSTRUCTIONS = """Ты — вежливый и приветливый консультант по подбору автомобилей.
-Хвали пользователя за его выбор. Например, отличный выбор. Астон Мартин - это крутая машина.
+Тебя зовут «Моторчик Тёма» — это твоё фиксированное имя персонажа.
+Всегда говори «Меня зовут Моторчик Тёма», НИКОГДА не используй плейсхолдеры вроде «[Ваше имя]» и не придумывай другие имена.
+Если пользователь только начинает диалог или явно спрашивает, как тебя зовут, ответь в духе:
+«Здравствуйте! Меня зовут Моторчик Тёма, я ваш консультант по подбору автомобилей.»
+Хвали пользователя за его выбор. Например, отличный выбор. Астон Мартин — это крутая машина.
 Старайся подбирать такой же жаргон, какой использует пользователь.
 Отвечай вежливо, с лёгкой уместной долей юмора и по делу.
 Если пользователь грубит или использует мат, отвечай спокойно и профессионально, без мата и оскорблений,
@@ -69,17 +82,76 @@ PROMPT_GENERATE_RESPONSE_WITH_RESULTS = """Ты — консультант по 
 
 ВАЖНО: По критериям пользователя выполнен поиск в нашей базе данных. Ниже — единственный допустимый список автомобилей (поле description по каждому). Ты ОБЯЗАН перечислить их пользователю в виде нумерованного списка: 1. {описание первого}, 2. {описание второго} и т.д. Строго ЗАПРЕЩЕНО придумывать или добавлять любые другие автомобили. Используй только описания из списка ниже. Ответ начинай с заглавной буквы, затем сразу нумерованный список."""
 
+PROMPT_RAG_SELECT_CARS = """Ты — консультант по подбору автомобилей. Общайся на русском, вежливо.
+
+По запросу пользователя выполнен векторный поиск. Ниже — топ-10 кандидатов. Ты должен выбрать из них только те автомобили, которые действительно подходят под запрос (релевантность соответствия). Рекомендуй не более 6 машин — только те, что ты оцениваешь как подходящие; остальные не упоминай.
+
+Формат ответа ДОЛЖЕН быть строго следующим:
+1. Сначала одна-две короткие общие фразы приветствия/одобрения или уточнения (например: «Отличный запрос, сейчас покажу несколько вариантов.»).
+2. Далее для КАЖДОГО выбранного автомобиля (от 1 до 6 штук) выводи РОВНО три строки подряд:
+   Строка 1 — начинай с эмодзи автомобиля 🚗, затем: Марка, Модель, Поколение/серия (если есть в данных), Тип кузова (Модификация/двигатель/коробка/л.с.), Год.
+   Пример строки 1:
+   🚗 Kia, Shuma, I, Лифтбек (1.5 AT (88 л.с.)), 1997.
+   Используй только реальные поля из базы данных по этому авто: марка (mark_name), модель (model_name), при наличии поколение/серия из текстовых полей, тип кузова (body_type), модификацию/двигатель/коробку/лошадиные силы (modification, engine_volume, transmission, horsepower) и год (year). Не придумывай параметры, которых нет в данных.
+   Строка 2 — начинай с эмодзи информации ℹ️, затем краткую фразу про страну БЕЗ слов «Страна производства»: только «Выпускается в [страна]» или «Собирается в [страна]», затем точку и текстовое описание модели из поля description (можно сократить).
+   Пример строки 2:
+   ℹ️ Выпускается в Южная Корея. Эту модель использовали в съёмках рекламы авиакомпании «полёт начинается с дороги»; ещё её видели у одного дипломата.
+   Запрещено писать «Страна производства:» — только «Выпускается в …» или «Собирается в …».
+   Строка 3 — визуальный разделитель: линия из символов подчёркивания, например: _____________________________ (не менее 20 символов).
+
+Строго запрещено:
+- Нумерованные списки, маркированные списки, заголовки, дополнительные абзацы между машинами.
+- Любые машины, которых нет в переданном списке кандидатов.
+- Фраза «Страна производства» во второй строке.
+
+Допустимо:
+- Если ни один из кандидатов не подходит, вежливо сообщи об этом и задай один уточняющий вопрос, оставаясь в общем стиле, без перечисления автомобилей.
+
+Важно: указывай только машины из списка ниже. Строго ЗАПРЕЩЕНО придумывать автомобили, которых нет в списке.
+
+Ответ начинай с заглавной буквы."""
+
+PROMPT_CARS_SELECT_60_AND_ASK = """Ты — консультант по подбору автомобилей. Общайся на русском, вежливо.
+
+По запросу пользователя выполнен векторный поиск. Ниже — ровно 10 кандидатов (список CANDIDATES_PLACEHOLDER).
+
+Твои задачи:
+1) Оцени релевантность каждого кандидата запросу пользователя (в процентах соответствия).
+2) Выбери и выведи в ответе ТОЛЬКО те автомобили, у которых соответствие 60% и выше. Остальные не упоминай.
+3) Для каждого выбранного автомобиля используй строго такой формат (три элемента подряд):
+   Строка 1: начни с эмодзи 🚗 (автомобиль), затем Марка, Модель, тип кузова (модификация/двигатель/коробка/л.с.), Год.
+   Строка 2: начни с эмодзи ℹ️ (информация), затем «Выпускается в [страна]» или «Собирается в [страна]» — БЕЗ фразы «Страна производства» — затем точку и краткое описание из поля description.
+   Строка 3: визуальный разделитель — линия из подчёркиваний, например _____________________________ (не менее 20 символов). Не пиши слово «разделитель».
+
+4) Текущие собранные параметры: CURRENT_PARAMS_PLACEHOLDER. Всего параметров: PARAMS_COUNT_PLACEHOLDER. Нужно минимум 3 для точного подбора.
+   Если параметров меньше 3 — в КОНЦЕ своего сообщения обязательно задай один-два коротких уточняющих вопроса (марка, модель, тип кузова, год, коробка, топливо и т.п.), чтобы собрать недостающие. Не предлагай конкретные модели — только вопросы.
+
+Порядок ответа: короткое приветствие/одобрение → выбранные автомобили (только с соответствием ≥60%) в указанном формате → если параметров < 3, блок с уточняющими вопросами.
+
+Строго запрещено: придумывать автомобили; писать «Страна производства»; писать слово «разделитель» вместо линии подчёркиваний; пересказывать историю диалога или выводить префиксы вроде «Пользователь:», «Ассистент:». Просто дай финальный ответ пользователю без явно оформленного протокола диалога. Ответ начинай с заглавной буквы."""
+
 PROMPT_GENERATE_RESPONSE_CLARIFY = """Ты — консультант по подбору автомобилей. Общайся на русском, вежливо.
 
 Сейчас для поиска в базе не хватает параметров: нужно минимум 3 из перечня (марка, модель, тип кузова, год, модификация, коробка, топливо, объём двигателя, мощность). Уже собрано: CURRENT_PARAMS_PLACEHOLDER
 
 Строго: задай пользователю ровно один короткий уточняющий вопрос (про один из недостающих параметров). Не предлагай и не называй конкретные автомобили — только вопрос. Ответ начинай с заглавной буквы."""
 
+PROMPT_CLASSIFY_CAR_CONTEXT = """Ты — классификатор намерений пользователя. По последнему сообщению и контексту диалога определи: связано ли сообщение с автомобилями или с подбором/поиском автомобиля?
+
+Считай «про автомобиль», если пользователь: упоминает марку, модель, тип кузова, год, топливо, коробку, ищет машину, хочет подобрать авто, спрашивает про характеристики авто, сравнивает машины и т.п.
+Считай «не про автомобиль», если: приветствие, общие вопросы не про авто, оффтоп (погода, еда и т.д.), пустое или неясное сообщение без намёка на авто.
+
+Ответь строго одним словом: ДА или НЕТ. Никаких пояснений."""
+
+PROMPT_SMALL_TALK_NO_CAR = """Ты — вежливый консультант по подбору автомобилей. Сообщение пользователя не связано с поиском автомобиля (приветствие, общий разговор или неясный запрос).
+
+Твоя задача: вежливо пообщаться, поблагодарить за обращение и мягко направить разговор к подбору авто. Задай один-два коротких уточняющих вопроса о том, какой автомобиль интересует пользователь (например: марка, тип кузова, для чего нужна машина, бюджет). Не предлагай конкретные модели — только пригласи к диалогу о подборе. Не пересказывай переписку и не используй форматы «Пользователь:», «Ассистент:» — просто дай ответ. Отвечай кратко и по-русски. Ответ начинай с заглавной буквы."""
+
 PROMPT_NO_CARS_ASK_ANOTHER = """Ты — консультант по подбору автомобилей. Общайся на русском, вежливо.
 
 По запросу пользователя в нашем сервисе не нашлось подходящего автомобиля. Нужно вежливо сказать об этом и предложить подобрать другой, не менее крутой вариант.
 
-Обязательно: начни с фразы в духе «К сожалению, в нашем сервисе нет такого автомобиля. Давайте подберём другой, не менее крутой.» Затем задай ровно один уточняющий вопрос (марка, модель, тип кузова, год, модификация, коробка, топливо, объём или мощность), чтобы продолжить подбор. Ответ начинай с заглавной буквы."""
+Обязательно: начни с фразы в духе «К сожалению, в нашем сервисе нет такого автомобиля. Давайте подберём другой, не менее крутой.» Затем задай ровно один уточняющий вопрос (марка, модель, тип кузова, год, модификация, коробка, топливо, объём или мощность), чтобы продолжить подбор. Не пересказывай предыдущие сообщения и не используй префиксы «Пользователь:», «Ассистент:» — сразу формулируй ответ пользователю. Ответ начинай с заглавной буквы."""
 
 
 # Таймаут одного запроса к LLM (секунды). Два вызова подряд — до 2 * LLM_REQUEST_TIMEOUT.
@@ -183,15 +255,25 @@ def _call_genapi(messages: List[Dict[str, str]]) -> str:
 
 def _llm_chat(messages: List[Dict[str, str]]) -> str:
     """
-    Унифицированный вызов LLM: сейчас всегда идёт через GigaChat.
-    Если настройки GigaChat не заданы или запрос падает, возвращаем пустую строку
-    (выше по стеку это превращается в пользовательское сообщение об ошибке).
+    Унифицированный вызов LLM: при наличии Yandex (YANDEX_FOLDER_ID + YANDEX_API_KEY)
+    используется YandexGPT; иначе GigaChat.
+    Если выбранный провайдер не настроен или запрос падает — возвращаем пустую строку.
     """
     if not messages:
         return ""
 
+    # Yandex LLM (те же учётные данные, что и для эмбеддингов)
+    if settings.yandex_folder_id and settings.yandex_api_key:
+        try:
+            text = yandex_llm_service.completion(messages)
+            if text:
+                return text
+        except Exception as e:  # noqa: BLE001
+            logger.exception("Yandex LLM failed, fallback to GigaChat: %s", e)
+        # При пустом ответе или ошибке — fallback на GigaChat, если настроен
+
     if not settings.gigachat_credentials:
-        logger.error("GigaChat не настроен: gigachat_credentials пустые")
+        logger.error("LLM не настроен: ни Yandex, ни GigaChat (gigachat_credentials пустые)")
         return ""
 
     giga_messages: list[Messages] = []
@@ -228,6 +310,75 @@ def _llm_chat(messages: List[Dict[str, str]]) -> str:
     message = response.choices[0].message
     content = getattr(message, "content", "") or ""
     return content.strip()
+
+
+def classify_message_about_car(messages: list[dict[str, str]]) -> bool:
+    """
+    Определяет по последнему сообщению и контексту, связано ли сообщение с автомобилями/подбором авто.
+    Возвращает True, если в контексте есть что-то про автомобиль; иначе False (small talk / уточняющие вопросы).
+    """
+    if not messages:
+        return False
+    system_content = _with_style_instructions(PROMPT_CLASSIFY_CAR_CONTEXT)
+    api_messages = [{"role": "system", "content": system_content}]
+    # Передаём последние 3–5 сообщений для контекста
+    for m in messages[-6:]:
+        role = m.get("role", "user")
+        content = m.get("content") or ""
+        if role in ("user", "assistant") and content.strip():
+            api_messages.append({"role": role, "content": content})
+    try:
+        raw = _llm_chat(api_messages)
+    except Exception as e:  # noqa: BLE001
+        logger.exception("classify_message_about_car failed: %s", e)
+        # При ошибке считаем, что про авто (чтобы не блокировать поиск)
+        return True
+    if not raw:
+        return True
+    answer = raw.strip().upper()
+    return "ДА" in answer or "YES" in answer
+
+
+def generate_response_small_talk(messages: list[dict[str, str]]) -> str:
+    """
+    Ответ, когда сообщение не про автомобиль: вежливо пообщаться и задать уточняющие вопросы про авто.
+    Векторный поиск не выполняется.
+    """
+    # Если пользователь явно спрашивает, как зовут ассистента — отвечаем детерминированно,
+    # не полагаясь на LLM, чтобы не появлялись шаблоны вроде «[Ваше имя]».
+    last_user = ""
+    for m in reversed(messages or []):
+        if m.get("role") == "user":
+            last_user = (m.get("content") or "").strip().lower()
+            break
+    if last_user and (
+        "как тебя зовут" in last_user
+        or "как вас зовут" in last_user
+        or "тебя зовут" in last_user
+        or "вас зовут" in last_user
+    ):
+        return (
+            "Здравствуйте! Меня зовут Моторчик Тёма, я консультант по подбору автомобилей. "
+            "Расскажите, какой автомобиль вы ищете — марку, тип кузова или для каких задач нужна машина?"
+        )
+
+    system_content = _with_style_instructions(PROMPT_SMALL_TALK_NO_CAR)
+    api_messages = [{"role": "system", "content": system_content}]
+    for m in messages:
+        role = m.get("role", "user")
+        content = m.get("content") or ""
+        if role in ("user", "assistant"):
+            api_messages.append({"role": role, "content": content})
+    try:
+        text = _llm_chat(api_messages)
+    except Exception as e:  # noqa: BLE001
+        logger.exception("generate_response_small_talk failed: %s", e)
+        return "Спасибо за обращение! Подскажите, какой автомобиль вы ищете — марку, тип кузова или цель использования?"
+    if not text:
+        return "Спасибо за обращение! Подскажите, какой автомобиль вы ищете — марку, тип кузова или цель использования?"
+    if text and text[0].islower():
+        text = text[0].upper() + text[1:]
+    return text
 
 
 def chat_complete(messages: list[dict[str, str]]) -> str:
@@ -347,10 +498,39 @@ def extract_params_fallback(user_texts: list[str], body_type_reference: list[str
         result["transmission"] = "вариатор"
     elif re.search(r"\b(робот|роботизированная)\b", text):
         result["transmission"] = "робот"
-    # Год
+    # Год (конкретное значение, если явно указали)
     year_match = re.search(r"\b(19\d{2}|20[0-2]\d)\b", text)
     if year_match:
         result["year"] = year_match.group(1)
+    # Относительные ограничения по возрасту: «не старше 15 лет», «старше 10 лет» и т.п.
+    current_year = datetime.utcnow().year
+    # «не старше 15 лет» → машина не старше N лет → год не меньше (current_year - N).
+    # Если пользователь менял мнение несколько раз, берём ПОСЛЕДНЕЕ упоминание.
+    not_older_matches = list(re.finditer(r"не\s+старше\s+(\d{1,2})\s+лет", text))
+    if not_older_matches:
+        try:
+            years = int(not_older_matches[-1].group(1))
+            min_year = current_year - years
+            result["year_min"] = str(min_year)
+        except ValueError:
+            pass
+    # «старше 15 лет» → машина старше N лет → год не больше (current_year - N)
+    older_matches = list(re.finditer(r"старше\s+(\d{1,2})\s+лет", text))
+    if older_matches:
+        try:
+            years = int(older_matches[-1].group(1))
+            max_year = current_year - years
+            result["year_max"] = str(max_year)
+        except ValueError:
+            pass
+    # «не новее 2015 года» → год выпуска не новее → year_max = 2015
+    not_newer_year_matches = list(re.finditer(r"не\s+новее\s+(19\d{2}|20[0-2]\d)", text))
+    if not_newer_year_matches:
+        result["year_max"] = not_newer_year_matches[-1].group(1)
+    # «не старше 2015 года» → год не старше → year_min = 2015
+    not_older_year_matches = list(re.finditer(r"не\s+старше\s+(19\d{2}|20[0-2]\d)", text))
+    if not_older_year_matches:
+        result["year_min"] = not_older_year_matches[-1].group(1)
     # Объём двигателя (1.6, 2.0)
     vol_match = re.search(r"\b(\d{1}\.\d{1,2})\s*(?:л|литр|литра)?", text)
     if vol_match:
@@ -519,6 +699,7 @@ def _format_car_for_prompt(car) -> str:
 def _format_car_descriptions_for_llm(search_results: list) -> str:
     """
     Формирует для LLM список полей description найденных автомобилей (из БД).
+    (legacy — используется для старого промпта без RAG)
     """
     parts: list[str] = []
     for idx, car in enumerate(search_results[:10], start=1):
@@ -528,26 +709,158 @@ def _format_car_descriptions_for_llm(search_results: list) -> str:
     return "\n\n".join(parts) if parts else "Нет данных."
 
 
+def _format_cars_full_for_llm(search_results: list) -> str:
+    """
+    Формирует для LLM полные данные о каждом автомобиле (RAG-промпт).
+    Использует _format_car_for_prompt() для каждого авто.
+    """
+    parts: list[str] = []
+    for idx, car in enumerate(search_results[:10], start=1):
+        car_block = _format_car_for_prompt(car)
+        parts.append(f"Автомобиль {idx}:\n{car_block}")
+    return "\n\n".join(parts) if parts else "Нет данных."
+
+
+def _format_cars_for_user_answer(search_results: list) -> str:
+    """
+    Формирует финальный текстовый ответ для пользователя:
+    - короткое приветствие/одобрение;
+    - затем по каждой машине три строки в заданном формате.
+    """
+    if not search_results:
+        return "Пока не удалось найти подходящие автомобили."
+
+    # Ограничим количество машин, чтобы не перегружать ответ
+    cars_to_show = list(search_results[:6])
+
+    lines: list[str] = []
+    # Приветствие / общие слова одобрения и уточнения
+    lines.append(
+        "Здравствуйте! Рад вас видеть у нас. Давайте подберём что-то классное из списка."
+    )
+    lines.append(
+        "Вот что я вижу подходящим под ваш запрос:"
+    )
+    lines.append("")  # пустая строка перед списком машин
+
+    for car in cars_to_show:
+        mark = getattr(car, "mark_name", "") or ""
+        model = getattr(car, "model_name", "") or ""
+        body_type = getattr(car, "body_type", "") or ""
+        year = getattr(car, "year", None)
+        modification = getattr(car, "modification", "") or ""
+        engine_volume = getattr(car, "engine_volume", None)
+        transmission = getattr(car, "transmission", "") or ""
+        horsepower = getattr(car, "horsepower", None)
+        country = getattr(car, "country", "") or ""
+        description = getattr(car, "description", None)
+
+        # Строка 1: (иконка машинки) Марка, Модель, [Тип кузова] ([модификация/двигатель/коробка/л.с.]), Год.
+        details_parts: list[str] = []
+        if modification:
+            details_parts.append(modification)
+        else:
+            engine_part = ""
+            if engine_volume is not None:
+                try:
+                    engine_part = f"{float(engine_volume):.1f} л"
+                except (TypeError, ValueError):
+                    engine_part = str(engine_volume)
+            tr_part = transmission
+            hp_part = ""
+            if horsepower is not None:
+                hp_part = f"{horsepower} л.с."
+            combined_inner = ", ".join(
+                [p for p in [engine_part, tr_part, hp_part] if p]
+            )
+            if combined_inner:
+                details_parts.append(combined_inner)
+        details_str = ", ".join(details_parts) if details_parts else ""
+
+        body_part = body_type if body_type else ""
+        if body_part and details_str:
+            body_and_mod = f"{body_part} ({details_str})"
+        elif body_part:
+            body_and_mod = body_part
+        elif details_str:
+            body_and_mod = details_str
+        else:
+            body_and_mod = ""
+
+        year_part = f"{year}." if year is not None else ""
+
+        line1_parts: list[str] = [mark, model]
+        if body_and_mod:
+            line1_parts.append(body_and_mod)
+        if year_part:
+            line1_parts.append(year_part)
+        line1 = ", ".join(p for p in line1_parts if p)
+        lines.append(f"🚗 {line1}")
+        lines.append("")  # пустая строка между основной и инфо-строкой
+
+        # Строка 2: ℹ️ Выпускается в <country>. <description> (без «Страна производства»)
+        desc_text = (description and str(description).strip()) or ""
+        if len(desc_text) > 400:
+            desc_text = desc_text[:397] + "..."
+        if country:
+            info_line = f"ℹ️ Выпускается в {country}. {desc_text}".strip()
+        else:
+            info_line = f"ℹ️ {desc_text}".strip()
+        lines.append(info_line)
+        # Строка 3: визуальный разделитель
+        lines.append("_____________________________")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def _normalize_car_response_icons(text: str) -> str:
+    """
+    Заменяет в ответе LLM текстовые плейсхолдеры на реальные иконки и разделитель,
+    убирает лишнее «Страна производства».
+    """
+    if not text or not text.strip():
+        return text
+    t = text
+    # Иконки
+    t = t.replace("(иконка автомобиля цветная)", "🚗")
+    t = t.replace("(иконка цветная инфо)", "ℹ️")
+    t = t.replace("(иконка машинки)", "🚗")
+    t = t.replace("(иконка инфо)", "ℹ️")
+    # Слово «разделитель» на отдельной строке — линия подчёркиваний
+    t = re.sub(r"^\s*разделитель\s*$", "_____________________________", t, flags=re.MULTILINE)
+    # «Страна производства: X» → «Выпускается в X»
+    t = re.sub(
+        r"Страна производства\s*:\s*([^.]+?)(?=\.|$)",
+        r"Выпускается в \1",
+        t,
+        flags=re.IGNORECASE,
+    )
+    return t
+
+
 def generate_response(
     messages: list[dict[str, str]],
     params: dict,
     search_results: list,
     criteria_fulfilled: bool = False,
+    parameters_count: int = 0,
 ) -> str:
     """
-    Шаг 2: генерация текстового ответа пользователю.
-    - Если есть search_results — в промпт LLM передаётся список description найденных авто из БД,
-      ответ формирует LLM на основе только этих данных.
-    - Если критериев было достаточно (criteria_fulfilled), но поиск вернул 0 — детерминированное
-      сообщение «в базе не найдено».
-    - Если параметров ещё мало — LLM задаёт один уточняющий вопрос.
+    Генерация ответа пользователю.
+    - Если есть search_results: LLM выбирает из топ-10 только кандидатов с соответствием >= 60%,
+      выводит их в заданном формате и в конце задаёт уточняющие вопросы, если параметров < 3.
+    - Если критериев было достаточно, но поиск вернул 0 — сообщение «в базе не найдено» + вопрос.
+    - Если параметров мало и поиска не было — один уточняющий вопрос.
     """
     if search_results:
-        descriptions_block = _format_car_descriptions_for_llm(search_results)
+        # Есть топ-10 кандидатов: LLM отбирает >= 60%, выводит их и при необходимости задаёт вопросы
+        candidates_text = _format_cars_full_for_llm(search_results)
+        current_params_str = ", ".join(f"{k}={v}" for k, v in params.items() if v) or "пока нет"
         system_content = _with_style_instructions(
-            PROMPT_GENERATE_RESPONSE_WITH_RESULTS
-            + "\n\n--- Список автомобилей из нашей базы (поле description по каждому) ---\n\n"
-            + descriptions_block
+            PROMPT_CARS_SELECT_60_AND_ASK.replace("CANDIDATES_PLACEHOLDER", candidates_text)
+            .replace("CURRENT_PARAMS_PLACEHOLDER", current_params_str)
+            .replace("PARAMS_COUNT_PLACEHOLDER", str(parameters_count))
         )
         api_messages = [{"role": "system", "content": system_content}]
         for m in messages:
@@ -558,12 +871,30 @@ def generate_response(
         try:
             text = _llm_chat(api_messages)
         except Exception as e:  # noqa: BLE001
-            logger.exception("DeepSeek generate_response (with results) failed: %s", e)
-            return "Не удалось обработать ответ. Попробуйте ещё раз."
-        if not text:
-            return "Не удалось получить ответ. Попробуйте ещё раз."
+            logger.exception("DeepSeek generate_response (select 60%% + ask) failed: %s", e)
+            return _format_cars_for_user_answer(search_results[:6])
+        if not text or not text.strip():
+            return _format_cars_for_user_answer(search_results[:6])
+        text = _normalize_car_response_icons(text)
         if text and text[0].islower():
             text = text[0].upper() + text[1:]
+        # Жёсткая страховка: если параметров всё ещё меньше MIN_PARAMS_FOR_SEARCH,
+        # а LLM почему-то не задал уточняющий вопрос, добавляем короткий вопрос сами.
+        if parameters_count < MIN_PARAMS_FOR_SEARCH:
+            last_chunk = (text or "")[-300:].lower()
+            has_question = "?" in last_chunk or any(
+                kw in last_chunk
+                for kw in (
+                    "какой ", "какая ", "какие ", "уточните", "расскажите", "подскажите",
+                    "интересует", "что именно",
+                )
+            )
+            if not has_question:
+                extra_q = (
+                    "\n\nЧтобы подобрать точнее, подскажите, пожалуйста, "
+                    "какой тип кузова, год выпуска или бюджет вы примерно рассматриваете?"
+                )
+                text = (text or "").rstrip() + extra_q
         return text
 
     if criteria_fulfilled:
@@ -609,10 +940,27 @@ def generate_response(
     try:
         text = _llm_chat(api_messages)
     except Exception as e:  # noqa: BLE001
-        logger.exception("DeepSeek generate_response failed: %s", e)
+        logger.exception("DeepSeek generate_response (clarify) failed: %s", e)
         return "Не удалось обработать запрос. Попробуйте ещё раз."
     if not text:
         return "Не удалось получить ответ. Попробуйте ещё раз."
     if text and text[0].islower():
         text = text[0].upper() + text[1:]
+    # Страховка: если параметров всё ещё меньше MIN_PARAMS_FOR_SEARCH,
+    # гарантируем наличие хотя бы одного уточняющего вопроса в ответе.
+    if parameters_count < MIN_PARAMS_FOR_SEARCH:
+        last_chunk = (text or "")[-300:].lower()
+        has_question = "?" in last_chunk or any(
+            kw in last_chunk
+            for kw in (
+                "какой ", "какая ", "какие ", "уточните", "расскажите", "подскажите",
+                "интересует", "что именно",
+            )
+        )
+        if not has_question:
+            extra_q = (
+                "\n\nЧтобы подобрать точнее, подскажите, пожалуйста, "
+                "какую марку, модель, тип кузова или год выпуска вы примерно рассматриваете?"
+            )
+            text = (text or "").rstrip() + extra_q
     return text

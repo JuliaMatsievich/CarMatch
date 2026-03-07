@@ -1,0 +1,177 @@
+.layout {
+  display: flex;
+  min-height: 100vh;
+  background: #f0f4ff;
+}
+
+.sidebar {
+  width: 220px;
+  min-width: 220px;
+  background: #1e3a8a;
+  color: #e0e7ff;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebarHeader {
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(191, 219, 254, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logoWithIcon {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.carIconBg {
+  background: #1e40af;
+  padding: 0.5rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.carIcon {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: #eef2ff;
+}
+
+.logoText {
+  display: flex;
+  flex-direction: column;
+}
+
+.logoText h1 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.logoText span {
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+.nav {
+  padding: 8px;
+  flex: 1;
+}
+
+.navSectionTitle {
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.7;
+}
+
+.navList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.navItemButton {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.navItemButton:hover {
+  background: rgba(129, 140, 248, 0.18);
+}
+
+.navItemActive {
+  background: #1e40af;
+  color: #e5e7eb;
+}
+
+.navItemIcon {
+  width: 18px;
+  height: 18px;
+}
+
+.navItemLabel {
+  flex: 1;
+  text-align: left;
+}
+
+.sidebarFooter {
+  padding: 10px 12px 14px;
+  border-top: 1px solid rgba(191, 219, 254, 0.24);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.8rem;
+}
+
+.adminEmail {
+  opacity: 0.85;
+}
+
+.logoutBtn {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(191, 219, 254, 0.6);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.logoutBtn:hover {
+  background: rgba(30, 64, 175, 0.7);
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mainHeader {
+  padding: 14px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #ffffff;
+}
+
+.mainTitle {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.mainSubtitle {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.mainContent {
+  padding: 16px 20px 24px;
+  flex: 1;
+  min-height: 0;
+}
+

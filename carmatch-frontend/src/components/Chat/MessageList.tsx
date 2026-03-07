@@ -44,15 +44,17 @@ export function MessageList({ messages }: MessageListProps) {
                   <Car size={20} className={styles.iconCar} />
                 </span>
               )}
-              <div
-                className={
-                  m.role === "user" ? styles.userMessage : styles.assistantMessage
-                }
-              >
-                <span className={styles.role}>
-                  {m.role === "user" ? "Вы" : "CarMatch"}
-                </span>
-                <p className={styles.content}>{m.content}</p>
+              <div className={m.role === "user" ? styles.userBubble : styles.assistantBubble}>
+                <div
+                  className={
+                    m.role === "user" ? styles.userMessage : styles.assistantMessage
+                  }
+                >
+                  <span className={styles.role}>
+                    {m.role === "user" ? "Вы" : "CarMatch"}
+                  </span>
+                  <p className={styles.content}>{m.content}</p>
+                </div>
               </div>
               {m.role === "user" ? (
                 <span className={styles.iconWrap} aria-hidden>

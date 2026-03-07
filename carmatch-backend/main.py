@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.config import settings
-from src.routers import auth, chat, chat_sessions, cars
+from src.routers import auth, chat, chat_sessions, cars, admin_cars, admin_sessions, admin_users
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,6 +34,9 @@ app.include_router(auth.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
 app.include_router(chat_sessions.router, prefix="/api/v1")
 app.include_router(cars.router, prefix="/api/v1")
+app.include_router(admin_cars.router, prefix="/api/v1")
+app.include_router(admin_sessions.router, prefix="/api/v1")
+app.include_router(admin_users.router, prefix="/api/v1")
 
 
 @app.on_event("startup")
