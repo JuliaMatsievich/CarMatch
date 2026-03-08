@@ -29,15 +29,20 @@ class Settings(BaseSettings):
 
     def get_database_url(self) -> str:
         """URL для подключения к БД: только ASCII, psycopg3 требует postgresql+psycopg://."""
-        url = self.database_url
-        if not url.isascii():
+        url = (self.database_url or "").strip()
+        if not url or not url.isascii():
             return DEFAULT_DATABASE_URL
-        # Render Postgres даёт postgresql:// или postgres:// — конвертируем для psycopg3
+        # Ссылка Railway не развернулась (осталась как ${{...}})
+        if "${{" in url or "}}" in url:
+            return DEFAULT_DATABASE_URL
+        # Railway/Render дают postgresql:// или postgres:// — конвертируем для psycopg3
         if "postgresql+psycopg" not in url:
             if url.startswith("postgresql://"):
                 url = url.replace("postgresql://", "postgresql+psycopg://", 1)
             elif url.startswith("postgres://"):
                 url = url.replace("postgres://", "postgresql+psycopg://", 1)
+            else:
+                return DEFAULT_DATABASE_URL
         return url
 
     def get_cors_origins_list(self) -> list[str]:
