@@ -6,7 +6,8 @@ COPY package*.json ./
 RUN npm install
 
 COPY . .
+RUN npm run build
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+CMD ["sh", "-c", "exec serve -s dist -l ${PORT:-3000}"]
