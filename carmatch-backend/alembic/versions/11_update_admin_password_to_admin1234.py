@@ -19,19 +19,18 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-  op.execute(
-      sa.text(
-          """
+    op.execute(
+        sa.text(
+            """
 UPDATE users
 SET password_hash = :hash
 WHERE email = :email
 """
-      ),
-      {
-          "hash": "$2b$12$NoRgJhr9dHT7npSV4EH7GOjZ98F3bYF576ddozb7oQeXo8Zrm/9RG",
-          "email": "admin@mail.ru",
-      },
-  )
+        ).bindparams(
+            hash="$2b$12$NoRgJhr9dHT7npSV4EH7GOjZ98F3bYF576ddozb7oQeXo8Zrm/9RG",
+            email="admin@mail.ru",
+        )
+    )
 
 
 def downgrade() -> None:
