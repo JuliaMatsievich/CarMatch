@@ -256,21 +256,12 @@ def _call_genapi(messages: List[Dict[str, str]]) -> str:
 
 def _llm_chat(messages: List[Dict[str, str]]) -> str:
     """
-    Унифицированный вызов LLM: при наличии GenAPI — DeepSeek через GenAPI;
-    иначе Yandex (YANDEX_FOLDER_ID + YANDEX_API_KEY); иначе GigaChat.
+    Унифицированный вызов LLM: при наличии Yandex (YANDEX_FOLDER_ID + YANDEX_API_KEY)
+    используется YandexGPT; иначе GigaChat.
     Если выбранный провайдер не настроен или запрос падает — возвращаем пустую строку.
     """
     if not messages:
         return ""
-
-    # GenAPI (DeepSeek Reasoner) — приоритет для продакшена (Railway и т.д.)
-    if settings.genapi_api_key and settings.genapi_generate_url:
-        try:
-            text = _call_genapi(messages)
-            if text:
-                return text
-        except Exception as e:  # noqa: BLE001
-            logger.exception("GenAPI failed, fallback to Yandex/GigaChat: %s", e)
 
     # Yandex LLM (те же учётные данные, что и для эмбеддингов)
     if settings.yandex_folder_id and settings.yandex_api_key:
@@ -283,10 +274,8 @@ def _llm_chat(messages: List[Dict[str, str]]) -> str:
         # При пустом ответе или ошибке — fallback на GigaChat, если настроен
 
     if not settings.gigachat_credentials:
-        logger.error(
-            "LLM не настроен: задайте GENAPI_API_KEY и GENAPI_GENERATE_URL, "
-            "или Yandex (yandex_folder_id, yandex_api_key), или GigaChat (gigachat_credentials)"
-        )
+        logger.error("LLM не настроен: задайте Yandex (yandex_folder_id, yandex_api_key) "
+                     "или GigaChat (gigachat_credentials)")
         return ""
 
     giga_messages: list[Messages] = []
