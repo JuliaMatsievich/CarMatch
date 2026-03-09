@@ -36,10 +36,10 @@ def test_register_validation_email(client: TestClient):
 
 
 def test_register_validation_password(client: TestClient):
-    """Пароль короче 8 символов возвращает 422."""
+    """Пустой пароль возвращает 422."""
     response = client.post(
         "/api/v1/auth/register",
-        json={"email": "user@example.com", "password": "short"},
+        json={"email": "user@example.com", "password": ""},
     )
     assert response.status_code == 422
 

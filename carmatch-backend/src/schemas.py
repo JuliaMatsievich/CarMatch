@@ -5,12 +5,12 @@ from pydantic import BaseModel, EmailStr, Field
 
 class RegisterRequest(BaseModel):
     email: EmailStr
-    password: str = Field(..., min_length=8, description="Пароль не менее 8 символов")
+    password: str = Field(..., min_length=1, description="Пароль не должен быть пустым")
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: str = Field(..., min_length=8, description="Пароль не менее 8 символов")
+    password: str = Field(..., min_length=1, description="Пароль не должен быть пустым")
 
 
 class UserResponse(BaseModel):

@@ -34,11 +34,21 @@ export default function AdminLoginPage() {
       navigate("/admin/cars", { replace: true });
     } catch (err: unknown) {
       const ax = err as {
-        response?: { data?: { detail?: string } };
+        response?: {
+          data?: { detail?: string | { msg?: string }[] };
+          status?: number;
+        };
       };
       const detail = ax.response?.data?.detail;
       if (typeof detail === "string") {
         setError(detail);
+      } else if (Array.isArray(detail) && detail.length > 0) {
+        const first = detail[0];
+        const msg =
+          typeof first === "object" && first?.msg
+            ? first.msg
+            : "Ошибка валидации данных";
+        setError(msg);
       } else {
         setError("Не удалось войти в админ-панель");
       }
@@ -87,6 +97,7 @@ export default function AdminLoginPage() {
               value={formData.password}
               onChange={handleChange}
               required
+              autoComplete="current-password"
             />
           </div>
           <button

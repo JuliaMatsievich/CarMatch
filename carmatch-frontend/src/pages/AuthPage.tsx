@@ -22,7 +22,6 @@ export default function AuthPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-
     try {
       let isAdmin = false;
       if (isLogin) {
@@ -119,7 +118,7 @@ export default function AuthPage() {
               value={formData.password}
               onChange={handleChange}
               required
-              minLength={4}
+              autoComplete={isLogin ? "current-password" : "new-password"}
             />
           </div>
 
