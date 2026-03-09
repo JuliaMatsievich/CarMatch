@@ -30,3 +30,7 @@ htmlcov/
 # OS
 .DS_Store
 nul
+
+# DB dumps (local backup, do not commit)
+carmatch.dump
+*.dump
