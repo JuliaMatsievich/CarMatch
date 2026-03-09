@@ -254,10 +254,11 @@ def _call_genapi(messages: List[Dict[str, str]]) -> str:
     return text
 
 
-def _llm_chat(messages: List[Dict[str, str]]) -> str:
+def _llm_chat(messages: List[Dict[str, str]], max_tokens: int | None = None) -> str:
     """
     Унифицированный вызов LLM: при наличии Yandex (YANDEX_FOLDER_ID + YANDEX_API_KEY)
     используется YandexGPT; иначе GigaChat.
+    max_tokens: лимит токенов ответа (только для Yandex; меньше = быстрее для коротких задач).
     Если выбранный провайдер не настроен или запрос падает — возвращаем пустую строку.
     """
     if not messages:
@@ -266,7 +267,8 @@ def _llm_chat(messages: List[Dict[str, str]]) -> str:
     # Yandex LLM (те же учётные данные, что и для эмбеддингов)
     if settings.yandex_folder_id and settings.yandex_api_key:
         try:
-            text = yandex_llm_service.completion(messages)
+            max_tok = max_tokens if max_tokens is not None else 2000
+            text = yandex_llm_service.completion(messages, max_tokens=max_tok)
             if text:
                 return text
         except Exception as e:  # noqa: BLE001
@@ -637,7 +639,7 @@ def extract_params(
         if role in ("user", "assistant"):
             api_messages.append({"role": role, "content": content})
     try:
-        raw = _llm_chat(api_messages)
+        raw = _llm_chat(api_messages, max_tokens=800)
     except Exception as e:  # noqa: BLE001
         logger.exception("DeepSeek extract_params failed: %s", e)
         return []

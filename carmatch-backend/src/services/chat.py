@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -24,6 +25,7 @@ def _extract_country_from_description(description: str | None) -> str | None:
         return m.group(1).strip() or None
     return None
 
+from src.database import SessionLocal
 from src.models import Car, ChatMessage, SearchParameter, Session
 from src.services import deepseek as deepseek_service
 from src.services.reference_data.car_reference_service import get_body_type_reference
@@ -33,6 +35,9 @@ from src.services.vector_search import (
     sql_search_cars,
     vector_search_cars_with_scores,
 )
+
+# Лимит кандидатов векторного поиска в чате (меньше = быстрее ответ)
+CHAT_VECTOR_SEARCH_LIMIT = 12
 
 MIN_PARAMS_FOR_SEARCH = 3  # минимум параметров для «достаточно критериев» при отсутствии результатов
 
@@ -742,31 +747,56 @@ def add_message(
         return assistant_msg, session.extracted_params or {}, False, []
 
     # Векторный поиск и SQL‑фильтрация при любом упоминании машины:
-    # используем гибридное ранжирование (векторный поиск + параметры).
+    # используем гибридное ранжирование; векторный и SQL-поиск запускаем параллельно.
     search_results: list[Car] = []
     query_text = compose_search_query(merged, last_user_msg)
     if not query_text or not query_text.strip():
         query_text = (last_user_msg or "автомобиль").strip() or "автомобиль"
 
-    semantic_results = []
-    if query_text:
-        try:
-            semantic_results = vector_search_cars_with_scores(db, query_text, limit=20)
-            if semantic_results:
-                logger.info(
-                    "chat vector search: query=%r, candidates=%d",
-                    query_text[:100],
-                    len(semantic_results),
-                )
-        except Exception as e:  # noqa: BLE001
-            logger.exception("vector_search_cars_with_scores failed: %s", e)
-            semantic_results = []
-
     has_params = session.parameters_count > 0
-    ranked_results: list[tuple[Car, float]] = []
-    if semantic_results or has_params:
+    semantic_results: list = []
+    sql_cars: list = []
+
+    def _run_vector_search() -> list:
+        session_local = SessionLocal()
         try:
-            sql_cars = sql_search_cars(db, merged) if has_params else []
+            return vector_search_cars_with_scores(
+                session_local, query_text, limit=CHAT_VECTOR_SEARCH_LIMIT
+            )
+        finally:
+            session_local.close()
+
+    def _run_sql_search() -> list:
+        session_local = SessionLocal()
+        try:
+            return sql_search_cars(session_local, merged)
+        finally:
+            session_local.close()
+
+    if query_text:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            future_vec = executor.submit(_run_vector_search)
+            future_sql = executor.submit(_run_sql_search) if has_params else None
+            try:
+                semantic_results = future_vec.result()
+            except Exception as e:  # noqa: BLE001
+                logger.exception("vector_search_cars_with_scores failed: %s", e)
+            if future_sql:
+                try:
+                    sql_cars = future_sql.result()
+                except Exception as e:  # noqa: BLE001
+                    logger.exception("sql_search_cars failed: %s", e)
+
+    if semantic_results:
+        logger.info(
+            "chat vector search: query=%r, candidates=%d",
+            query_text[:100],
+            len(semantic_results),
+        )
+
+    ranked_results: list[tuple[Car, float]] = []
+    if semantic_results or sql_cars:
+        try:
             ranked_results = hybrid_rank(semantic_results, sql_cars, merged)
         except Exception as e:  # noqa: BLE001
             logger.exception("hybrid_rank failed: %s", e)
