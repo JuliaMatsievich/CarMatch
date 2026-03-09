@@ -294,6 +294,7 @@
 
 .typingIndicator {
   padding: 8px 16px 0;
+  margin-bottom: 10px;
   font-size: 0.9rem;
   color: #4b5563;
   text-align: center;

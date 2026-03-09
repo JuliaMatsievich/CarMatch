@@ -1,8 +1,17 @@
+.pageRoot {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
 .layoutGrid {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr) minmax(260px, 1.3fr);
   gap: 16px;
   align-items: stretch;
+  flex: 1;
+  min-height: 0;
 }
 
 .card {
@@ -29,6 +38,9 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .table {
@@ -109,6 +121,12 @@
   cursor: default;
 }
 
+.chatScrollWrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .chatList {
   list-style: none;
   margin: 0;
@@ -168,7 +186,7 @@
   background: #f9fafb;
   padding: 8px;
   font-size: 0.8rem;
-  overflow: hidden;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
@@ -180,8 +198,6 @@
   font-size: 0.75rem;
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 100%;
-  overflow: auto;
 }
 
 .logsPlaceholder {

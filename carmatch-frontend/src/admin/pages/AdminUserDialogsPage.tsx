@@ -127,23 +127,24 @@ function AdminUserDialogsInner() {
 
   return (
     <>
-      <button
-        type="button"
-        className={styles.backLink}
-        onClick={() => navigate("/admin/dialogs")}
-      >
-        ← Ко всем пользователям
-      </button>
+      <div className={styles.pageRoot}>
+        <button
+          type="button"
+          className={styles.backLink}
+          onClick={() => navigate("/admin/dialogs")}
+        >
+          ← Ко всем пользователям
+        </button>
 
-      <div className={styles.layoutGrid}>
-        <section className={styles.card}>
-          <div className={styles.cardHeader}>
-            <h3 className={styles.cardTitle}>
-              Диалоги пользователя #{userId}
-              {userEmail ? ` (${userEmail})` : ""}
-            </h3>
-          </div>
-          <div className={styles.sessionsWrapper}>
+        <div className={styles.layoutGrid}>
+          <section className={styles.card}>
+            <div className={styles.cardHeader}>
+              <h3 className={styles.cardTitle}>
+                Диалоги пользователя #{userId}
+                {userEmail ? ` (${userEmail})` : ""}
+              </h3>
+            </div>
+            <div className={styles.sessionsWrapper}>
             {isSessionsLoading && (
               <div style={{ padding: 12 }}>Загрузка диалогов...</div>
             )}
@@ -239,6 +240,7 @@ function AdminUserDialogsInner() {
           <div className={styles.cardHeader}>
             <h3 className={styles.cardTitle}>Чат</h3>
           </div>
+          <div className={styles.chatScrollWrap}>
           {isDetailLoading && (
             <div style={{ padding: 12 }}>Загрузка чата...</div>
           )}
@@ -301,6 +303,7 @@ function AdminUserDialogsInner() {
               Выберите диалог слева, чтобы увидеть сообщения.
             </div>
           )}
+          </div>
         </section>
 
         <section className={styles.card}>
@@ -325,6 +328,7 @@ function AdminUserDialogsInner() {
             )}
           </div>
         </section>
+        </div>
       </div>
 
       {confirmSessionId && (

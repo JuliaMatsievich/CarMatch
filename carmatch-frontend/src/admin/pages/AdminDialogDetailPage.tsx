@@ -44,7 +44,7 @@ function AdminDialogDetailInner() {
     ).toLocaleString("ru-RU")}`;
 
   return (
-    <>
+    <div className={styles.pageRoot}>
       <button
         type="button"
         className={styles.backLink}
@@ -151,7 +151,7 @@ function AdminDialogDetailInner() {
           </table>
         )}
       </section>
-    </>
+    </div>
   );
 }
 

@@ -12,9 +12,13 @@ export function MessageList({ messages }: MessageListProps) {
 
   useEffect(() => {
     const el = endRef.current;
-    if (el?.scrollIntoView) {
-      el.scrollIntoView({ behavior: "smooth", block: "end" });
-    }
+    if (!el?.scrollIntoView) return;
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        el.scrollIntoView({ behavior: "smooth", block: "end" });
+      });
+    });
+    return () => cancelAnimationFrame(id);
   }, [messages.length]);
 
   if (messages.length === 0) {

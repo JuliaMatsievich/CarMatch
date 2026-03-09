@@ -466,6 +466,35 @@ def _maybe_prepend_db5_notice(
     )
     return prefix + (response_text or "")
 
+
+_SELECTION_PREFIX_LINE = "Я подобрал для вас наиболее подходящие автомобили."
+
+
+def _dedupe_selection_prefix(text: str) -> str:
+    """
+    Убирает повторяющиеся строки с фразой «я подобрал для вас наиболее подходящие автомобили»,
+    оставляя только первое вхождение и нормализуя её к единому виду.
+    """
+    if not text:
+        return text
+    pattern = re.compile(
+        r"^\s*я подобрал для вас наиболее подходящие автомобили\.?\s*$",
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
+    lines = text.splitlines()
+    seen = False
+    result: list[str] = []
+    for line in lines:
+        if pattern.match(line):
+            if seen:
+                # Пропускаем повторные одинаковые строки
+                continue
+            seen = True
+            result.append(_SELECTION_PREFIX_LINE)
+        else:
+            result.append(line)
+    return "\n".join(result)
+
 def create_session(db: Session, user_id: int) -> Session:
     """Создаёт новую сессию для пользователя."""
     session = Session(
@@ -684,8 +713,9 @@ def add_message(
     # Если в последнем сообщении пользователь явно говорит, что год не важен / любой год,
     # снимаем ранее накопленные ограничения по year/year_min/year_max.
     merged = _clear_year_constraints_if_any_year_mentioned(last_user_msg, merged)
-    # Последнее сообщение пользователя имеет приоритет: если он передумал по кузову/марке/топливу и т.п.,
-    # переопределяем соответствующие параметры поверх уже накопленных.
+    # Приоритет последнего сообщения: если пользователь сначала сказал «рено», потом «бмв» —
+    # перезаписываем brand (и то же для body_type, fuel_type, transmission, year, engine_volume, horsepower).
+    # Для model/modification перезапись обеспечивается промптом LLM («последнее значение по типу») и порядком в merge.
     merged = _override_params_from_last_message(last_user_msg, merged)
 
     session.extracted_params = merged
@@ -944,6 +974,9 @@ def add_message(
                 # Не первый ответ: приветствие убираем везде, префикс добавляем в начало
                 text_wo_greeting = greeting_pattern.sub("", text).lstrip()
                 response_text = prefix_line + text_wo_greeting
+            # Страховка от дублей: если модель сама уже написала эту же фразу,
+            # оставляем только первое вхождение.
+            response_text = _dedupe_selection_prefix(response_text)
         search_results_serialized = [_car_to_metadata(c) for c in search_results]
 
         # Сохраняем ответ ассистента (с карточками в extra_metadata)
