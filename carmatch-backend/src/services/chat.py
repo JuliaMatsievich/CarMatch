@@ -162,6 +162,7 @@ def _message_mentions_car_or_params(text: str | None) -> bool:
         return True
     t = " " + text.strip().lower() + " "
     # Явное упоминание распространённых брендов — тоже считаем контекстом про авто
+    # «бэха»/«бэху» — разговорное для BMW, без этого «хочу бэху» уходило в small talk
     brand_keywords = [
         " renault ",
         " рено ",
@@ -169,6 +170,7 @@ def _message_mentions_car_or_params(text: str | None) -> bool:
         " тойота ",
         " bmw ",
         " бмв ",
+        " бэх",  # бэха, бэху, бэху — сленг для BMW
         " mercedes ",
         " мерседес ",
         " мерс ",
@@ -902,6 +904,17 @@ def add_message(
             query_text[:100],
             len(semantic_results),
         )
+    else:
+        logger.warning(
+            "chat vector search: 0 кандидатов (query=%r). Проверьте: YANDEX_FOLDER_ID/YANDEX_API_KEY, наличие embedding у машин в БД.",
+            query_text[:80],
+        )
+
+    if not sql_cars and has_params:
+        logger.warning(
+            "chat sql_search: 0 машин по параметрам merged=%s. Проверьте данные в таблице cars.",
+            merged,
+        )
 
     ranked_results: list[tuple[Car, float]] = []
     if semantic_results or sql_cars:
@@ -967,6 +980,24 @@ def add_message(
             len(semantic_results),
         )
         search_results = [car for car, _score in semantic_results[:top_n]]
+
+    # Фоллбек: векторный и SQL по параметрам ничего не вернули — показываем хотя бы несколько машин из каталога.
+    if not search_results:
+        try:
+            session_fallback = SessionLocal()
+            try:
+                fallback_cars = sql_search_cars(session_fallback, {}, limit=10)
+                if fallback_cars:
+                    search_results = fallback_cars
+                    logger.info(
+                        "chat fallback: вектор/SQL по параметрам вернули 0, показываем %d машин из каталога (без фильтров)",
+                        len(fallback_cars),
+                    )
+            finally:
+                session_fallback.close()
+        except Exception as e:  # noqa: BLE001
+            logger.exception("chat fallback sql_search(пустые параметры) failed: %s", e)
+
     # Если пользователь просит «машину как у Джеймса Бонда» —
     # поднимаем Aston Martin в начало списка кандидатов.
     search_results = _prioritize_aston_for_bond_query(last_user_msg, search_results)

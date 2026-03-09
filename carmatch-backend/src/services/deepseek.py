@@ -462,7 +462,7 @@ FALLBACK_BODY_TYPE_KEYWORDS = [
 FALLBACK_BRAND_KEYWORDS = [
     (r"\b(renault|рено)\b", "Renault"),
     (r"\b(toyota|тойота)\b", "Toyota"),
-    (r"\b(bmw|бмв)\b", "BMW"),
+    (r"\b(bmw|бмв|бэха|бэху)\b", "BMW"),
     (r"\b(mercedes|мерседес|мерс)\b", "Mercedes-Benz"),
     (r"\b(lada|лада)\b", "Lada"),
     (r"\b(volkswagen|вольксваген|фольксваген|ву)\b", "Volkswagen"),
