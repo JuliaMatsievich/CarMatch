@@ -75,24 +75,28 @@ function AdminUserDialogsInner() {
   const logsTitle = useMemo(() => {
     if (!selectedMessage) return "Логи";
     return selectedMessage.role === "user"
-      ? "Extracted params (извлечённые параметры)"
+      ? "Что извлек LLM / параметры сессии"
       : "Search results (результаты поиска)";
   }, [selectedMessage]);
+
+  /** Для сообщения пользователя: что вернул extract_params по этому сообщению (массив { type, value, confidence }). */
+  const perMessageExtracted = useMemo(() => {
+    if (!selectedMessage || selectedMessage.role !== "user") return null;
+    const meta = selectedMessage.ai_metadata as
+      | { extracted_params?: unknown }
+      | null
+      | undefined;
+    return meta?.extracted_params ?? null;
+  }, [selectedMessage]);
+
+  /** Накопленные параметры сессии (после всех сообщений) — показываем при выборе сообщения пользователя. */
+  const sessionParams = sessionDetail?.session?.extracted_params ?? null;
 
   const logsPayload = useMemo(() => {
     if (!selectedMessage || !sessionDetail) return null;
 
     if (selectedMessage.role === "user") {
-      const meta = selectedMessage.ai_metadata as
-        | { extracted_params?: unknown }
-        | null
-        | undefined;
-
-      if (meta?.extracted_params != null) {
-        return meta.extracted_params;
-      }
-
-      return null;
+      return perMessageExtracted;
     }
 
     const meta = selectedMessage.ai_metadata as
@@ -105,7 +109,7 @@ function AdminUserDialogsInner() {
     }
 
     return meta ?? null;
-  }, [selectedMessage, sessionDetail]);
+  }, [selectedMessage, sessionDetail, perMessageExtracted]);
 
   const deleteMutation = useMutation({
     mutationFn: (sessionId: string) => adminDeleteSession(sessionId),
@@ -316,12 +320,34 @@ function AdminUserDialogsInner() {
                 Нажмите на сообщение в чате, чтобы увидеть связанные логи.
               </div>
             )}
-            {selectedMessage && logsPayload && (
+            {selectedMessage?.role === "user" && sessionParams != null && (
+              <div className={styles.logsSection}>
+                <strong>Накопленные параметры сессии</strong> (brand, body_type и т.д. — то, по чему идёт поиск):
+                <pre className={styles.logsPre}>
+                  {JSON.stringify(sessionParams, null, 2)}
+                </pre>
+              </div>
+            )}
+            {selectedMessage?.role === "user" && (
+              <div className={styles.logsSection}>
+                <strong>Что извлек LLM из этого сообщения</strong> (массив extracted_params):
+                {perMessageExtracted != null ? (
+                  <pre className={styles.logsPre}>
+                    {JSON.stringify(perMessageExtracted, null, 2)}
+                  </pre>
+                ) : (
+                  <div className={styles.logsPlaceholder}>
+                    Нет данных (сообщение могло быть до сохранения этой метаданной или без вызова extract_params).
+                  </div>
+                )}
+              </div>
+            )}
+            {selectedMessage?.role !== "user" && logsPayload != null && (
               <pre className={styles.logsPre}>
                 {JSON.stringify(logsPayload, null, 2)}
               </pre>
             )}
-            {selectedMessage && !logsPayload && (
+            {selectedMessage?.role !== "user" && !logsPayload && (
               <div className={styles.logsPlaceholder}>
                 Для этого сообщения нет дополнительных логов.
               </div>

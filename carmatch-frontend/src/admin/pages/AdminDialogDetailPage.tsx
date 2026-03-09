@@ -92,6 +92,14 @@ function AdminDialogDetailInner() {
               Автомобилей в выдаче: {session.cars_found}
             </div>
           </div>
+          {Object.keys(session.extracted_params || {}).length > 0 && (
+            <div style={{ padding: "0 14px 10px", fontSize: "0.85rem" }}>
+              <strong>Накопленные параметры сессии</strong> (что извлек LLM по диалогу):
+              <pre style={{ marginTop: 6, whiteSpace: "pre-wrap", background: "#f8fafc", padding: 10, borderRadius: 6 }}>
+                {JSON.stringify(session.extracted_params, null, 2)}
+              </pre>
+            </div>
+          )}
           <ul className={styles.aiLogList}>
             {assistantMessagesWithAi.map((m) => (
               <li key={m.id} className={styles.aiLogItem}>

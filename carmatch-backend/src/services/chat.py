@@ -469,15 +469,47 @@ def _maybe_prepend_db5_notice(
 
 _SELECTION_PREFIX_LINE = "Я подобрал для вас наиболее подходящие автомобили."
 
+# Регулярка: фраза в начале строки (опционально с точкой и текстом после) — для вырезания дубля
+_SELECTION_PREFIX_STRIP_RE = re.compile(
+    r"^\s*я подобрал для вас наиболее подходящие автомобили\.?\s*(?:\.\s*)?",
+    flags=re.IGNORECASE,
+)
+
+
+def _strip_selection_prefix_from_start(text: str) -> str:
+    """Убирает фразу «я подобрал для вас...» с начала текста (одна строка или несколько)."""
+    if not text or not text.strip():
+        return text
+    stripped = text.strip()
+    if _SELECTION_PREFIX_STRIP_RE.match(stripped):
+        rest = _SELECTION_PREFIX_STRIP_RE.sub("", stripped, count=1).lstrip()
+        return rest if rest else text
+    # Проверяем первую строку отдельно: если только она — эта фраза, убираем и её и пустые следом
+    lines = text.splitlines()
+    if not lines:
+        return text
+    first = lines[0].strip()
+    if _SELECTION_PREFIX_STRIP_RE.match(first):
+        rest_first = _SELECTION_PREFIX_STRIP_RE.sub("", first, count=1).lstrip()
+        if rest_first:
+            lines[0] = rest_first
+            return "\n".join(lines)
+        # Первая строка целиком — фраза, выкидываем её и ведущие пустые
+        i = 1
+        while i < len(lines) and not lines[i].strip():
+            i += 1
+        return "\n".join(lines[i:]).strip()
+    return text
+
 
 def _dedupe_selection_prefix(text: str) -> str:
     """
     Убирает повторяющиеся строки с фразой «я подобрал для вас наиболее подходящие автомобили»,
-    оставляя только первое вхождение и нормализуя её к единому виду.
+    оставляя только первое вхождение. Также обрезает эту фразу с начала строк, где после неё идёт другой текст.
     """
     if not text:
         return text
-    pattern = re.compile(
+    pattern_full_line = re.compile(
         r"^\s*я подобрал для вас наиболее подходящие автомобили\.?\s*$",
         flags=re.IGNORECASE | re.MULTILINE,
     )
@@ -485,14 +517,27 @@ def _dedupe_selection_prefix(text: str) -> str:
     seen = False
     result: list[str] = []
     for line in lines:
-        if pattern.match(line):
+        if pattern_full_line.match(line):
             if seen:
-                # Пропускаем повторные одинаковые строки
                 continue
             seen = True
             result.append(_SELECTION_PREFIX_LINE)
         else:
-            result.append(line)
+            # Строка может начинаться с фразы и продолжаться другим текстом — убираем только фразу
+            stripped_line = line.strip()
+            if _SELECTION_PREFIX_STRIP_RE.match(stripped_line):
+                rest = _SELECTION_PREFIX_STRIP_RE.sub("", stripped_line, count=1).lstrip()
+                if seen and rest:
+                    result.append(rest)
+                elif not seen:
+                    seen = True
+                    result.append(_SELECTION_PREFIX_LINE)
+                    if rest:
+                        result.append(rest)
+                else:
+                    result.append(line)
+            else:
+                result.append(line)
     return "\n".join(result)
 
 def create_session(db: Session, user_id: int) -> Session:
@@ -647,20 +692,6 @@ def add_message(
         logger.exception("deepseek extract_params failed: %s", e)
         extracted_params = []
 
-    # Сохраняем сырые извлечённые параметры в extra_metadata последнего
-    # пользовательского сообщения, чтобы в админке можно было видеть
-    # extracted_params именно для конкретного сообщения.
-    try:
-        if extracted_params:
-            user_msg.extra_metadata = {"extracted_params": extracted_params}
-            db.commit()
-            db.refresh(user_msg)
-    except Exception as e:  # noqa: BLE001
-        logger.exception(
-            "failed to store extracted_params in user_msg.extra_metadata: %s",
-            e,
-        )
-
     # Мержим: уже собранные + что вернул LLM + резервное извлечение по ключевым словам (если LLM что-то пропустил)
     # Дополнительно поддерживаем относительные ограничения по году (year_min, year_max),
     # которые приходят только из fallback-парсера.
@@ -688,13 +719,24 @@ def add_message(
             t = "brand"
         if t in allowed_types:
             merged[t] = val
-    # Резерв: по ключевым словам из всех сообщений пользователя (топливо, коробка, год, объём, мощность, кузов)
+    # Резерв: по ключевым словам из всех сообщений пользователя (топливо, коробка, год, объём, мощность, кузов).
+    # Отсюда может появиться body_type=хэтчбек/седан и т.д., если пользователь написал «хэтчбек»/«седан»,
+    # или если в справочнике body_type из БД есть «Хэтчбек 3 дв.» и в тексте есть слово «хэтчбек».
     user_texts = [m.get("content") or "" for m in messages if m.get("role") == "user"]
     fallback = deepseek_service.extract_params_fallback(user_texts, body_type_reference)
+    fallback_added: list[str] = []
     for key, value in fallback.items():
         if key in allowed_types and value and (not merged.get(key) or not str(merged.get(key)).strip()):
             merged[key] = value
+            fallback_added.append(f"{key}={value}")
             logger.info("extract_params_fallback: added %s=%s (LLM не вернул)", key, value)
+    if fallback_added:
+        logger.info(
+            "extract_params: итог — LLM вернул %s параметров; fallback добавил: %s; merged: %s",
+            len(extracted_params),
+            ", ".join(fallback_added),
+            merged,
+        )
     # Исправление: если LLM записал топливо в transmission — переносим в fuel_type и чистим transmission
     _fuel_to_type = (
         ("бензин", "бензин"), ("на бензине", "бензин"), ("бензиновый", "бензин"),
@@ -717,6 +759,43 @@ def add_message(
     # перезаписываем brand (и то же для body_type, fuel_type, transmission, year, engine_volume, horsepower).
     # Для model/modification перезапись обеспечивается промптом LLM («последнее значение по типу») и порядком в merge.
     merged = _override_params_from_last_message(last_user_msg, merged)
+
+    # Снимок параметров на момент этого сообщения (для админки):
+    # один объект на каждый тип параметра, с финальным значением после merge/fallback/override.
+    llm_types = {p.get("type") for p in extracted_params if isinstance(p, dict)}
+    snapshot_params: list[dict] = []
+    for t in allowed_types:
+        raw_val = merged.get(t)
+        val = (raw_val or "").strip() if raw_val is not None else ""
+        if not val:
+            continue
+        conf = 0.9
+        # Пытаемся взять confidence из LLM-ответа для этого типа
+        for p in reversed(extracted_params):
+            if p.get("type") == t:
+                try:
+                    conf = float(p.get("confidence", 0.9))
+                except (TypeError, ValueError):
+                    conf = 0.9
+                break
+        # Если параметр пришёл только из fallback, оставляем дефолтную уверенность
+        if t in fallback and t not in llm_types:
+            conf = 0.9
+        snapshot_params.append({"type": t, "value": val, "confidence": conf})
+
+    # Сохраняем снимок в extra_metadata последнего пользовательского сообщения
+    try:
+        user_msg.extra_metadata = {
+            "extracted_params": snapshot_params,
+            "extracted_params_raw": extracted_params,
+        }
+        db.commit()
+        db.refresh(user_msg)
+    except Exception as e:  # noqa: BLE001
+        logger.exception(
+            "failed to store extracted_params snapshot in user_msg.extra_metadata: %s",
+            e,
+        )
 
     session.extracted_params = merged
     session.parameters_count = sum(1 for v in merged.values() if v and str(v).strip())
@@ -966,16 +1045,18 @@ def add_message(
                 if m:
                     greeting = m.group(0).strip()
                     rest = text[text.index(m.group(0)) + len(m.group(0)) :].lstrip()
+                    rest = _strip_selection_prefix_from_start(rest)
                     response_text = greeting + "\n\n" + prefix_line + rest
                 else:
                     # Если LLM не начал с приветствия, просто добавляем префикс в начало
+                    text = _strip_selection_prefix_from_start(text)
                     response_text = prefix_line + text
             else:
                 # Не первый ответ: приветствие убираем везде, префикс добавляем в начало
                 text_wo_greeting = greeting_pattern.sub("", text).lstrip()
+                text_wo_greeting = _strip_selection_prefix_from_start(text_wo_greeting)
                 response_text = prefix_line + text_wo_greeting
-            # Страховка от дублей: если модель сама уже написала эту же фразу,
-            # оставляем только первое вхождение.
+            # Страховка от дублей: если модель всё же повторила фразу — оставляем одно вхождение
             response_text = _dedupe_selection_prefix(response_text)
         search_results_serialized = [_car_to_metadata(c) for c in search_results]
 

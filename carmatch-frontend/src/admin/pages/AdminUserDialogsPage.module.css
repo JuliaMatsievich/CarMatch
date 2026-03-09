@@ -191,6 +191,20 @@
   flex-direction: column;
 }
 
+.logsSection {
+  margin-bottom: 1rem;
+}
+
+.logsSection:last-child {
+  margin-bottom: 0;
+}
+
+.logsSection strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.8rem;
+}
+
 .logsPre {
   margin: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
